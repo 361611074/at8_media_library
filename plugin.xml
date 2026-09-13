@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin version="php">
+	<id>media_library</id>
+	<name>媒体库 · 相册式附件管理</name>
+	<url>https://www.at8.fun/</url>
+	<note>以相册（网格）形式管理图片与附件，支持按文章分类、文件类型、上传时间、作者等筛选，支持拖拽上传、批量操作、信息编辑与大图预览。</note>
+	<description>以相册（网格）形式集中管理 Z-BlogPHP 的图片与附件，提供比系统默认附件管理更完善的体验：
+
+1. 网格 / 列表两种视图自由切换，缩略图直达；
+2. 按文章分类筛选：附件通过所属文章自动关联分类，一键筛出某分类下的全部图片；
+3. 多维筛选：文件类型（图片/视频/音频/文档/压缩包/其他）、上传月份、上传者、关联文章、是否已被文章使用；
+4. 关键词搜索（文件名 / 原始文件名 / 标题 / 说明）；
+5. 拖拽或多选上传，实时进度；支持同名文件替换更新；
+6. 详情侧栏：大图预览、尺寸与大小统计、一键复制 URL / HTML / Markdown 代码；
+7. 可编辑标题、说明、图片 Alt（存于附件自定义域，不影响原表结构）；
+8. 批量选择、批量删除、批量关联到指定文章；
+9. 灯箱大图浏览，支持键盘左右切换与 Esc 关闭；
+10. 统计概览：附件总数、图片数、占用空间、未使用数一目了然。
+
+卸载插件不会删除任何已上传的附件文件。</description>
+	<path>main.php</path>
+	<include>include.php</include>
+	<level>1</level>
+	<author>
+		<name>漫步白月光</name>
+		<url>https://www.at8.fun/</url>
+		<email>361611074@qq.com</email>
+	</author>
+	<source>
+		<name>漫步白月光</name>
+		<url>https://www.at8.fun/</url>
+	</source>
+	<adapted>1.7.0</adapted>
+	<version>1.1.3</version>
+	<pubdate>2026-09-12</pubdate>
+	<modified>2026-09-13</modified>
+	<price>0</price>
+	<advanced></advanced>
+	<dependency></dependency>
+	<rewritefunctions></rewritefunctions>
+	<conflict></conflict>
+</plugin>
