@@ -1,0 +1,924 @@
+/* 媒体库 · 相册式附件管理
+ * 作者：漫步白月光 https://www.at8.fun/
+ * 规则前缀 mlx-，全部通过选择器特异性控制样式
+ */
+
+.mlx-root {
+	background: #f4f6fb;
+	min-height: 400px;
+	margin: 0;
+	padding: 0;
+}
+
+.mlx-wrap {
+	max-width: 1400px;
+	margin: 0 auto;
+	padding: 20px 24px 60px;
+	font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+/* ---------- 头部 ---------- */
+.mlx-header {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.mlx-title {
+	font-size: 22px;
+	font-weight: 700;
+	color: #1f2d3d;
+	margin: 0;
+	line-height: 1;
+}
+
+.mlx-stats {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.mlx-stat {
+	background: #fff;
+	border: 1px solid #e4e9f2;
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 12px;
+	color: #6b7a90;
+}
+
+.mlx-stat b {
+	color: #2a5cf5;
+	font-size: 15px;
+	margin-right: 4px;
+}
+
+.mlx-header-actions {
+	margin-left: auto;
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* ---------- 按钮 / 输入框 ---------- */
+.mlx-btn {
+	display: inline-block;
+	background: #fff;
+	border: 1px solid #d7deeb;
+	border-radius: 8px;
+	color: #3b4a5f;
+	font-size: 13px;
+	padding: 7px 14px;
+	cursor: pointer;
+	text-decoration: none;
+	line-height: 1.4;
+	transition: all .15s;
+}
+
+.mlx-btn:hover {
+	border-color: #2a5cf5;
+	color: #2a5cf5;
+	text-decoration: none;
+}
+
+.mlx-btn-primary {
+	background: #2a5cf5;
+	border-color: #2a5cf5;
+	color: #fff;
+}
+
+.mlx-btn-primary:hover {
+	background: #1f4ae0;
+	color: #fff;
+}
+
+.mlx-btn-danger {
+	color: #e5484d;
+}
+
+.mlx-btn-danger:hover {
+	border-color: #e5484d;
+	color: #e5484d;
+	background: #fef2f2;
+}
+
+.mlx-btn-sm {
+	padding: 4px 10px;
+	font-size: 12px;
+	border-radius: 6px;
+}
+
+.mlx-input {
+	background: #fff;
+	border: 1px solid #d7deeb;
+	border-radius: 8px;
+	color: #3b4a5f;
+	font-size: 13px;
+	padding: 7px 10px;
+	height: 34px;
+	box-sizing: border-box;
+	outline: none;
+	max-width: 160px;
+}
+
+.mlx-input:focus {
+	border-color: #2a5cf5;
+	box-shadow: 0 0 0 3px rgba(42, 92, 245, .12);
+}
+
+.mlx-mini {
+	max-width: 96px;
+}
+
+.mlx-search {
+	max-width: 220px;
+	flex: 1 1 180px;
+}
+
+.mlx-spacer {
+	flex: 1 1 auto;
+}
+
+/* ---------- 工具栏 ---------- */
+.mlx-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	background: #fff;
+	border: 1px solid #e4e9f2;
+	border-radius: 12px;
+	padding: 12px 14px;
+	margin-bottom: 12px;
+}
+
+.mlx-view-switch {
+	display: inline-flex;
+	border: 1px solid #d7deeb;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.mlx-vs-btn {
+	border: none;
+	background: #fff;
+	color: #8b98ab;
+	font-size: 15px;
+	width: 36px;
+	height: 32px;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.mlx-vs-btn + .mlx-vs-btn {
+	border-left: 1px solid #e4e9f2;
+}
+
+.mlx-vs-btn.active {
+	background: #2a5cf5;
+	color: #fff;
+}
+
+/* ---------- 批量条 ---------- */
+.mlx-bulkbar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	background: #eef3ff;
+	border: 1px solid #c9d8ff;
+	border-radius: 10px;
+	padding: 8px 14px;
+	margin-bottom: 12px;
+	font-size: 13px;
+	color: #3b4a5f;
+}
+
+/* ---------- 网格 ---------- */
+.mlx-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 14px;
+}
+
+.mlx-card {
+	background: #fff;
+	border: 1px solid #e4e9f2;
+	border-radius: 12px;
+	overflow: hidden;
+	cursor: pointer;
+	position: relative;
+	transition: box-shadow .15s, transform .15s;
+}
+
+.mlx-card:hover {
+	box-shadow: 0 6px 20px rgba(31, 45, 61, .12);
+	transform: translateY(-2px);
+}
+
+.mlx-card.selected {
+	border-color: #2a5cf5;
+	box-shadow: 0 0 0 2px rgba(42, 92, 245, .35);
+}
+
+.mlx-thumb {
+	position: relative;
+	width: 100%;
+	padding-top: 68%;
+	background: #f0f3f9 center/cover no-repeat;
+	display: block;
+	overflow: hidden;
+}
+
+.mlx-thumb img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.mlx-thumb .mlx-fileicon {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	color: #8b98ab;
+}
+
+.mlx-fileicon .mlx-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 10px;
+	background: #e3ebfa;
+	color: #2a5cf5;
+	font-size: 18px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-transform: uppercase;
+}
+
+.mlx-badge {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	background: rgba(31, 45, 61, .72);
+	color: #fff;
+	font-size: 11px;
+	border-radius: 5px;
+	padding: 2px 7px;
+	line-height: 1.5;
+	z-index: 2;
+}
+
+.mlx-badge.mlx-badge-missing {
+	background: #e5484d;
+}
+
+.mlx-check {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 2px solid #c8d2e2;
+	background: rgba(255, 255, 255, .9);
+	cursor: pointer;
+	z-index: 3;
+	box-sizing: border-box;
+	transition: all .12s;
+}
+
+.mlx-check:hover {
+	border-color: #2a5cf5;
+}
+
+.mlx-card.selected .mlx-check {
+	background: #2a5cf5 url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/12px no-repeat;
+	border-color: #2a5cf5;
+}
+
+.mlx-meta {
+	padding: 8px 10px 10px;
+}
+
+.mlx-meta-name {
+	font-size: 12px;
+	color: #2c3a4f;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 3px;
+}
+
+.mlx-meta-sub {
+	font-size: 11px;
+	color: #93a1b5;
+	display: flex;
+	gap: 8px;
+}
+
+.mlx-meta-cate {
+	margin-top: 4px;
+	font-size: 11px;
+	color: #2a5cf5;
+	background: #eef3ff;
+	border-radius: 4px;
+	padding: 1px 6px;
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	box-sizing: border-box;
+}
+
+/* ---------- 列表视图 ---------- */
+.mlx-root.mlx-listview .mlx-grid {
+	display: block;
+}
+
+.mlx-root.mlx-listview .mlx-card {
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+	border-radius: 8px;
+	margin-bottom: 6px;
+}
+
+.mlx-root.mlx-listview .mlx-thumb {
+	width: 56px;
+	height: 40px;
+	padding-top: 0;
+	flex: 0 0 56px;
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.mlx-root.mlx-listview .mlx-meta {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	padding: 0 12px;
+	min-width: 0;
+}
+
+.mlx-root.mlx-listview .mlx-meta-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+}
+
+.mlx-root.mlx-listview .mlx-meta-sub {
+	flex: 0 0 auto;
+}
+
+.mlx-root.mlx-listview .mlx-meta-cate {
+	margin: 0;
+}
+
+.mlx-root.mlx-listview .mlx-badge,
+.mlx-root.mlx-listview .mlx-check {
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.mlx-root.mlx-listview .mlx-badge {
+	left: 84px;
+}
+
+.mlx-root.mlx-listview .mlx-check {
+	right: 12px;
+}
+
+/* ---------- 空态 / 加载 ---------- */
+.mlx-empty {
+	text-align: center;
+	color: #93a1b5;
+	padding: 70px 0 40px;
+}
+
+.mlx-empty-icon {
+	font-size: 40px;
+	margin: 0 0 8px;
+}
+
+.mlx-empty-sub {
+	font-size: 12px;
+	color: #b6c1d1;
+}
+
+.mlx-loading {
+	text-align: center;
+	color: #93a1b5;
+	padding: 24px 0;
+}
+
+/* ---------- 分页 ---------- */
+.mlx-pager {
+	display: flex;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 22px;
+	flex-wrap: wrap;
+}
+
+.mlx-pager button {
+	min-width: 34px;
+	height: 34px;
+	border: 1px solid #d7deeb;
+	background: #fff;
+	border-radius: 8px;
+	color: #3b4a5f;
+	font-size: 13px;
+	cursor: pointer;
+	padding: 0 10px;
+}
+
+.mlx-pager button:hover {
+	border-color: #2a5cf5;
+	color: #2a5cf5;
+}
+
+.mlx-pager button.active {
+	background: #2a5cf5;
+	border-color: #2a5cf5;
+	color: #fff;
+}
+
+.mlx-pager button:disabled {
+	opacity: .4;
+	cursor: default;
+}
+
+.mlx-sentinel {
+	height: 1px;
+}
+
+/* ---------- 详情抽屉 ---------- */
+.mlx-drawer-mask {
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 35, .35);
+	z-index: 8990;
+}
+
+.mlx-drawer-mask.open {
+	display: block;
+}
+
+.mlx-drawer {
+	position: fixed;
+	top: 0;
+	right: -460px;
+	width: 440px;
+	max-width: 92vw;
+	height: 100%;
+	background: #fff;
+	box-shadow: -8px 0 32px rgba(15, 23, 35, .18);
+	z-index: 8991;
+	transition: right .22s ease;
+	overflow-y: auto;
+	box-sizing: border-box;
+}
+
+.mlx-drawer.open {
+	right: 0;
+}
+
+.mlx-dw-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 14px 16px;
+	border-bottom: 1px solid #eef1f7;
+	position: sticky;
+	top: 0;
+	background: #fff;
+	z-index: 2;
+}
+
+.mlx-dw-head b {
+	flex: 1 1 auto;
+	font-size: 14px;
+	color: #1f2d3d;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mlx-dw-preview {
+	background: #f0f3f9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	max-height: 340px;
+	overflow: hidden;
+	border-bottom: 1px solid #eef1f7;
+}
+
+.mlx-dw-preview img {
+	max-width: 100%;
+	max-height: 340px;
+	display: block;
+	cursor: zoom-in;
+}
+
+.mlx-dw-preview .mlx-fileicon .mlx-icon {
+	width: 64px;
+	height: 64px;
+	font-size: 24px;
+	border-radius: 14px;
+}
+
+.mlx-dw-preview .mlx-fileicon {
+	flex-direction: column;
+	gap: 8px;
+	padding: 50px 0;
+	color: #8b98ab;
+}
+
+.mlx-dw-body {
+	padding: 14px 16px 30px;
+}
+
+.mlx-dw-field {
+	margin-bottom: 12px;
+}
+
+.mlx-dw-field label {
+	display: block;
+	font-size: 12px;
+	color: #6b7a90;
+	margin-bottom: 5px;
+}
+
+.mlx-dw-field .mlx-input {
+	width: 100%;
+	max-width: none;
+}
+
+.mlx-dw-field textarea.mlx-input {
+	height: auto;
+	min-height: 56px;
+	resize: vertical;
+	font-family: inherit;
+}
+
+.mlx-dw-info {
+	border: 1px solid #eef1f7;
+	border-radius: 10px;
+	padding: 10px 12px;
+	font-size: 12px;
+	color: #6b7a90;
+	margin-bottom: 14px;
+}
+
+.mlx-dw-info table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.mlx-dw-info td {
+	padding: 4px 2px;
+	vertical-align: top;
+	word-break: break-all;
+}
+
+.mlx-dw-info td:first-child {
+	color: #93a1b5;
+	width: 76px;
+	white-space: nowrap;
+}
+
+.mlx-dw-info .mlx-missing {
+	color: #e5484d;
+	font-weight: 600;
+}
+
+.mlx-dw-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.mlx-dw-save {
+	margin-top: 4px;
+}
+
+/* ---------- 上传面板 ---------- */
+.mlx-upload-panel {
+	display: none;
+	position: fixed;
+	right: 24px;
+	bottom: 24px;
+	width: 420px;
+	max-width: 94vw;
+	background: #fff;
+	border: 1px solid #e4e9f2;
+	border-radius: 14px;
+	box-shadow: 0 12px 40px rgba(15, 23, 35, .22);
+	z-index: 8995;
+	overflow: hidden;
+}
+
+.mlx-upload-panel.open {
+	display: block;
+}
+
+.mlx-up-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 14px;
+	background: #f8fafd;
+	border-bottom: 1px solid #eef1f7;
+	font-size: 13px;
+	color: #1f2d3d;
+}
+
+.mlx-up-drop {
+	margin: 12px 14px;
+	border: 2px dashed #c8d2e2;
+	border-radius: 10px;
+	text-align: center;
+	padding: 26px 10px;
+	color: #6b7a90;
+	font-size: 13px;
+	cursor: pointer;
+	transition: all .15s;
+}
+
+.mlx-up-drop:hover,
+.mlx-up-drop.dragover {
+	border-color: #2a5cf5;
+	background: #f2f6ff;
+}
+
+.mlx-up-sub {
+	font-size: 11px;
+	color: #a9b4c4;
+	margin-top: 4px;
+}
+
+.mlx-up-list {
+	max-height: 260px;
+	overflow-y: auto;
+	padding: 0 14px 14px;
+}
+
+.mlx-up-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+	color: #3b4a5f;
+	padding: 7px 0;
+	border-bottom: 1px dashed #eef1f7;
+}
+
+.mlx-up-item .mlx-up-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mlx-up-bar {
+	flex: 0 0 90px;
+	height: 6px;
+	background: #edf1f7;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.mlx-up-bar i {
+	display: block;
+	height: 100%;
+	background: #2a5cf5;
+	width: 0;
+	transition: width .2s;
+}
+
+.mlx-up-status {
+	flex: 0 0 44px;
+	text-align: right;
+	color: #93a1b5;
+}
+
+.mlx-up-status.ok {
+	color: #1cad6e;
+}
+
+.mlx-up-status.err {
+	color: #e5484d;
+}
+
+/* ---------- 拖拽入页提示 ---------- */
+.mlx-dropzone-tip {
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(42, 92, 245, .08);
+	border: 3px dashed #2a5cf5;
+	z-index: 8999;
+	color: #2a5cf5;
+	font-size: 20px;
+	font-weight: 700;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.mlx-dropzone-tip.show {
+	display: flex;
+}
+
+/* ---------- 灯箱 ---------- */
+.mlx-lightbox {
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(10, 14, 22, .88);
+	z-index: 8998;
+}
+
+.mlx-lightbox.open {
+	display: block;
+}
+
+.mlx-lb-inner {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+	box-sizing: border-box;
+}
+
+.mlx-lb-inner img {
+	max-width: 92%;
+	max-height: 84%;
+	box-shadow: 0 8px 50px rgba(0, 0, 0, .5);
+	border-radius: 4px;
+}
+
+.mlx-lb-caption {
+	color: #c8d2e2;
+	font-size: 13px;
+	margin-top: 14px;
+	text-align: center;
+	word-break: break-all;
+}
+
+.mlx-lb-btn {
+	position: absolute;
+	background: rgba(255, 255, 255, .12);
+	border: none;
+	color: #fff;
+	font-size: 26px;
+	width: 46px;
+	height: 46px;
+	border-radius: 50%;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.mlx-lb-btn:hover {
+	background: rgba(255, 255, 255, .25);
+}
+
+.mlx-lb-prev {
+	left: 18px;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.mlx-lb-next {
+	right: 18px;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.mlx-lb-close {
+	right: 18px;
+	top: 16px;
+}
+
+/* ---------- 弹窗（批量关联） ---------- */
+.mlx-modal-mask {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 35, .45);
+	z-index: 8996;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.mlx-modal {
+	background: #fff;
+	border-radius: 14px;
+	width: 440px;
+	max-width: 92vw;
+	box-shadow: 0 16px 60px rgba(15, 23, 35, .3);
+	overflow: hidden;
+}
+
+.mlx-modal-head {
+	padding: 14px 18px;
+	font-size: 15px;
+	font-weight: 700;
+	color: #1f2d3d;
+	border-bottom: 1px solid #eef1f7;
+}
+
+.mlx-modal-body {
+	padding: 16px 18px;
+	font-size: 13px;
+	color: #3b4a5f;
+}
+
+.mlx-modal-body .mlx-input {
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+}
+
+.mlx-modal-foot {
+	padding: 12px 18px 16px;
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.mlx-ac-list {
+	max-height: 240px;
+	overflow-y: auto;
+	border: 1px solid #eef1f7;
+	border-radius: 8px;
+	margin-top: 8px;
+}
+
+.mlx-ac-item {
+	padding: 8px 12px;
+	cursor: pointer;
+	font-size: 13px;
+	border-bottom: 1px solid #f4f6fb;
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.mlx-ac-item:hover {
+	background: #f2f6ff;
+}
+
+.mlx-ac-item.mlx-ac-active {
+	background: #eef3ff;
+	color: #2a5cf5;
+}
+
+.mlx-ac-item span {
+	color: #93a1b5;
+	font-size: 11px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 760px) {
+	.mlx-wrap {
+		padding: 14px 12px 40px;
+	}
+
+	.mlx-header-actions {
+		margin-left: 0;
+		width: 100%;
+	}
+
+	.mlx-grid {
+		grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+		gap: 10px;
+	}
+
+	.mlx-drawer {
+		width: 100%;
+		max-width: 100%;
+		right: -100%;
+	}
+}
