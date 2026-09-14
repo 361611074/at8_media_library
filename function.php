@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.1.3');
+    define('MEDIA_LIBRARY_VERSION', '1.1.4');
 }
 
 /**
@@ -398,9 +398,9 @@ function media_library_upload_row($u)
 
     $row = array();
     $row['id'] = (int) $u->ID;
-    $row['name'] = $u->SourceName;        // 原始文件名
-    $row['path'] = $u->Name;              // 相对路径
-    $row['url'] = $zbp->host . $u->Name;  // 完整 URL
+    $row['name'] = $u->SourceName;                    // 原始文件名
+    $row['path'] = $u->Name;                          // 相对路径（原始存储值）
+    $row['url'] = media_library_upload_url($u);       // 完整 URL
     $row['size'] = (int) $u->Size;
     $row['size_text'] = media_library_size_text((int) $u->Size);
     $row['mime'] = $u->MimeType;
@@ -427,9 +427,9 @@ function media_library_upload_row($u)
         $row['alt'] = (string) @$u->Metas->media_alt;
     }
 
-    // 文件是否真实存在
-    $file = $zbp->path . $u->Name;
-    $row['exists'] = file_exists($file) ? 1 : 0;
+    // 文件是否真实存在（多路径探测，兼容系统上传的存储格式）
+    $file = media_library_disk_path($u->Name);
+    $row['exists'] = ($file !== '') ? 1 : 0;
 
     // 图片尺寸
     $row['width'] = 0;
@@ -715,7 +715,56 @@ function media_library_authors($scan)
 /**
  * 概览统计
  */
+/**
+ * 汇总数据缓存（写入/替换/删除/关联操作后由 media_library_stats_flush() 失效）
+ */
+function media_library_stats_ttl()
+{
+    return 300; // 缓存 5 分钟
+}
+
+function media_library_stats_flush()
+{
+    global $zbp;
+    if (isset($zbp->cache) && is_object($zbp->cache)) {
+        $zbp->cache->media_library_stats_time = 0;
+        if (method_exists($zbp, 'SaveCache')) {
+            $zbp->SaveCache();
+        }
+    }
+}
+
 function media_library_stats()
+{
+    global $zbp;
+
+    // 读缓存
+    if (isset($zbp->cache) && is_object($zbp->cache)) {
+        $ts = (int) $zbp->cache->media_library_stats_time;
+        $raw = (string) $zbp->cache->media_library_stats;
+        if ($raw !== '' && $ts > 0 && (time() - $ts) < media_library_stats_ttl()) {
+            $cached = @unserialize($raw); // 数据由本插件自身写入
+            if (is_array($cached) && isset($cached['total'])) {
+                return $cached;
+            }
+        }
+    }
+
+    $data = media_library_stats_compute();
+
+    // 写缓存
+    if (isset($zbp->cache) && is_object($zbp->cache)) {
+        $zbp->cache->media_library_stats = serialize($data);
+        $zbp->cache->media_library_stats_time = time();
+        if (method_exists($zbp, 'SaveCache')) {
+            $zbp->SaveCache();
+        }
+    }
+
+    return $data;
+}
+
+function media_library_stats_compute()
 {
     global $zbp;
     $t = $zbp->table['Upload'];
@@ -934,38 +983,115 @@ function media_library_safe_relpath($rel)
 }
 
 /**
- * 允许上传的扩展名 = 插件内置类型 ∩ 站点后台「允许上传的文件类型」
- * 默认不含 svg / svgz / xml / xsl / html 等可内嵌脚本的格式（避免同源 XSS）
+ * 解析附件在磁盘上的真实路径
+ * 兼容系统附件与本插件两种 ul_Name 存储格式：
+ *  - zb_users/upload/... （站点根相对）
+ *  - upload/...          （zb_users 相对，系统附件管理常见）
+ *  - 纯文件名            （个别上传流程只存文件名，按上传目录逐层探测）
+ * 找不到返回 ''；结果必须落在 zb_users/upload/ 内（realpath 包含校验，防穿越）
+ */
+function media_library_disk_path($name)
+{
+    global $zbp;
+    $name = str_replace('\\', '/', trim((string) $name));
+    $name = ltrim($name, '/');
+    if ($name === '' || strpos($name, '..') !== false || strpos($name, "\0") !== false) {
+        return '';
+    }
+
+    $cands = array($name);
+    if (strpos($name, 'zb_users/') === 0) {
+        $cands[] = substr($name, 9);
+    } elseif (strpos($name, 'upload/') === 0) {
+        $cands[] = 'zb_users/' . $name;
+    } else {
+        $m = date('Y');
+        $cands[] = 'zb_users/upload/' . date('Y/m') . '/' . $name;
+        $cands[] = 'zb_users/upload/' . $name;
+        $cands[] = 'upload/' . date('Y/m') . '/' . $name;
+        $cands[] = 'upload/' . $name;
+    }
+
+    $uploadRoot = @realpath($zbp->usersdir . 'upload');
+    if ($uploadRoot === false || $uploadRoot === '') {
+        return '';
+    }
+    foreach ($cands as $c) {
+        if ($c === '') {
+            continue;
+        }
+        foreach (array($zbp->path, $zbp->usersdir) as $base) {
+            $real = @realpath($base . $c);
+            if ($real !== false && $real !== '' && strpos($real, $uploadRoot) === 0 && @is_file($real)) {
+                return $real;
+            }
+        }
+    }
+    return '';
+}
+
+/**
+ * 附件的访问 URL（兼容不同 ul_Name 存储格式）
+ */
+function media_library_upload_url($u)
+{
+    global $zbp;
+    $name = str_replace('\\', '/', trim((string) $u->Name));
+    $name = ltrim($name, '/');
+    if (preg_match('#^https?://#i', $name)) {
+        return $name; // 个别流程直接存完整 URL
+    }
+    if (stripos($name, 'zb_users/') === 0) {
+        return $zbp->host . $name;
+    }
+    return $zbp->host . 'zb_users/' . $name;
+}
+
+/**
+ * 允许上传的扩展名（跟随站点后台「允许上传的文件类型」设置）
+ * - 站点设置了白名单 → 以站点为准（zba / apk 等站点允许的类型均可上传）
+ * - 站点未设置 → 使用插件内置类型
+ * - 服务端可执行脚本（php/exe/js/html 等）无论何时都拒绝
+ * - svg / svgz / xml / xsl / swf 等可内嵌脚本的格式默认排除，站点明确允许时才放行
  */
 function media_library_allow_exts()
 {
     global $zbp;
 
+    // 硬拒绝：可执行 / 服务端脚本，任何情况下不允许
+    $deny = array(
+        'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar',
+        'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'py', 'sh', 'bash',
+        'exe', 'dll', 'com', 'bat', 'cmd', 'msi', 'vbs', 'ps1',
+        'html', 'htm', 'shtml', 'xhtml', 'js', 'mjs', 'htaccess',
+    );
+
+    // 硬排除的可内嵌脚本格式：无论站点是否允许都不经本插件上传（防同源 XSS），
+    // 系统自带附件管理不受影响，如需 svg 可走系统上传
+    $risky = array('svg', 'svgz', 'xml', 'xsl', 'xslt', 'swf');
+
     $builtin = array(
-        'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico',
-        'mp4', 'webm', 'flv', 'mov',
-        'mp3', 'wav', 'ogg', 'm4a', 'aac',
-        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv',
-        'zip', 'rar', '7z', 'gz', 'tar', 'bz2',
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico', 'heic', 'avif', 'tif', 'tiff',
+        'mp4', 'webm', 'flv', 'mov', 'avi', 'mkv', 'wmv', 'm4v',
+        'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac',
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv', 'epub',
+        'zip', 'rar', '7z', 'gz', 'tar', 'bz2', 'zba', 'apk', 'iso',
     );
 
     $site = isset($zbp->option['ZC_UPLOAD_FILETYPE']) ? (string) $zbp->option['ZC_UPLOAD_FILETYPE'] : '';
-    if (trim($site) === '') {
-        return $builtin;
-    }
-
-    $siteArr = preg_split('/[|,\s]+/', strtolower($site), -1, PREG_SPLIT_NO_EMPTY);
-    if (!is_array($siteArr)) {
-        return $builtin;
+    $siteArr = preg_split('/[|,\s]+/', strtolower(trim($site)), -1, PREG_SPLIT_NO_EMPTY);
+    if (!is_array($siteArr) || count($siteArr) === 0) {
+        $siteArr = $builtin; // 站点未设置白名单时使用内置类型
     }
 
     $out = array();
-    foreach ($builtin as $ext) {
-        if (in_array($ext, $siteArr)) {
-            $out[] = $ext;
+    foreach ($siteArr as $ext) {
+        if (in_array($ext, $deny) || in_array($ext, $risky)) {
+            continue;
         }
+        $out[] = $ext;
     }
-    return $out; // 站点白名单里一个都不含时，结果为空（即拒绝上传），遵从前台设置
+    return $out;
 }
 
 /**
