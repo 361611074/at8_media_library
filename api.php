@@ -74,6 +74,7 @@ if ($act == 'upload') {
         $u = media_library_save_one($f, $logid);
         $rows[] = media_library_upload_row($u);
     }
+    media_library_stats_flush();
     media_library_ok($rows);
 }
 
@@ -113,12 +114,11 @@ if ($act == 'replace') {
             media_library_error('文件内容不是有效图片：' . $orig);
         }
     }
-    // 目标路径必须落在附件目录内（防止记录被篡改后越权覆盖文件）
-    $rel = media_library_safe_relpath($u->Name);
-    if ($rel === '') {
-        media_library_error('附件路径异常，已拒绝操作');
+    // 目标文件必须真实存在且落在附件目录内（防止记录被篡改后越权覆盖文件）
+    $target = media_library_disk_path($u->Name);
+    if ($target === '') {
+        media_library_error('未找到原附件文件，无法替换（可删除后重新上传）');
     }
-    $target = $zbp->path . $rel;
     if (!@move_uploaded_file($f['tmp_name'], $target)) {
         media_library_error('替换失败，请检查目录写入权限');
     }
@@ -128,6 +128,7 @@ if ($act == 'replace') {
     $u->MimeType = media_library_detect_mime($target, $ext);
     $u->PostTime = time();
     $u->Save();
+    media_library_stats_flush();
     media_library_audit('替换附件 #' . $u->ID . ' ' . $u->Name . ' -> ' . $orig);
     media_library_ok(media_library_upload_row($u));
 }
@@ -178,16 +179,16 @@ if ($act == 'bulk') {
             if ($u->ID <= 0) {
                 continue;
             }
-            $rel = media_library_safe_relpath($u->Name);
-            if ($rel === '') {
-                $skip++;
-                continue; // 路径异常，拒绝删除
+            // 找得到磁盘文件才删文件；找不到（记录残留/外部存储）仅删记录
+            $disk = media_library_disk_path($u->Name);
+            if ($disk !== '') {
+                @unlink($disk);
             }
-            @unlink($zbp->path . $rel);
-            media_library_audit('删除附件 #' . $u->ID . ' ' . $rel);
+            media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
             $u->Del();
             $done++;
         }
+        media_library_stats_flush();
         media_library_ok(array('done' => $done, 'skipped' => $skip));
     }
 
@@ -217,13 +218,13 @@ if ($act == 'delete') {
     if ($u->ID == 0) {
         media_library_error('附件不存在');
     }
-    $rel = media_library_safe_relpath($u->Name);
-    if ($rel === '') {
-        media_library_error('附件路径异常，已拒绝删除');
+    $disk = media_library_disk_path($u->Name);
+    if ($disk !== '') {
+        @unlink($disk);
     }
-    @unlink($zbp->path . $rel);
-    media_library_audit('删除附件 #' . $u->ID . ' ' . $rel);
+    media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
     $u->Del();
+    media_library_stats_flush();
     media_library_ok(array('id' => $id));
 }
 
