@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.1.4');
+    define('MEDIA_LIBRARY_VERSION', '1.1.5');
 }
 
 /**
@@ -427,8 +427,8 @@ function media_library_upload_row($u)
         $row['alt'] = (string) @$u->Metas->media_alt;
     }
 
-    // 文件是否真实存在（多路径探测，兼容系统上传的存储格式）
-    $file = media_library_disk_path($u->Name);
+    // 文件是否真实存在（路径由 Upload 对象推导，兼容系统上传的存储格式）
+    $file = media_library_disk_path($u);
     $row['exists'] = ($file !== '') ? 1 : 0;
 
     // 图片尺寸
@@ -713,9 +713,6 @@ function media_library_authors($scan)
 }
 
 /**
- * 概览统计
- */
-/**
  * 汇总数据缓存（写入/替换/删除/关联操作后由 media_library_stats_flush() 失效）
  */
 function media_library_stats_ttl()
@@ -743,7 +740,7 @@ function media_library_stats()
         $ts = (int) $zbp->cache->media_library_stats_time;
         $raw = (string) $zbp->cache->media_library_stats;
         if ($raw !== '' && $ts > 0 && (time() - $ts) < media_library_stats_ttl()) {
-            $cached = @unserialize($raw); // 数据由本插件自身写入
+            $cached = @json_decode($raw, true); // JSON 存储，避免 unserialize 的对象注入面
             if (is_array($cached) && isset($cached['total'])) {
                 return $cached;
             }
@@ -752,9 +749,9 @@ function media_library_stats()
 
     $data = media_library_stats_compute();
 
-    // 写缓存
+    // 写缓存（JSON 编码，兼容旧版序列化残留：解析失败自动重算）
     if (isset($zbp->cache) && is_object($zbp->cache)) {
-        $zbp->cache->media_library_stats = serialize($data);
+        $zbp->cache->media_library_stats = (string) json_encode($data);
         $zbp->cache->media_library_stats_time = time();
         if (method_exists($zbp, 'SaveCache')) {
             $zbp->SaveCache();
@@ -960,79 +957,81 @@ function media_library_display_name($name)
 }
 
 /**
- * 校验并规范化附件在站点内的相对路径
- * 只允许 zb_users/ 下的附件目录，拒绝绝对路径、上级跳转与代码目录，防止越权删改文件
+ * 校验并返回落在附件目录（zb_users/upload/）内的真实路径，越界返回 ''
  */
-function media_library_safe_relpath($rel)
+function media_library_realpath_in_upload($path, $uploadRoot)
 {
-    $rel = str_replace('\\', '/', (string) $rel);
-    if ($rel === '' || strpos($rel, '..') !== false || strpos($rel, "\0") !== false) {
+    $real = @realpath($path);
+    if ($real === false || $real === '' || $uploadRoot === false || $uploadRoot === '') {
         return '';
     }
-    if ($rel[0] === '/' || preg_match('#^[A-Za-z]:#', $rel)) {
+    if (strpos($real, $uploadRoot) !== 0 || !@is_file($real)) {
         return '';
     }
-    if (strpos($rel, 'zb_users/') !== 0) {
-        return '';
-    }
-    // 禁止操作程序/缓存/日志等目录
-    if (preg_match('#^zb_users/(plugin|theme|cache|logs|data|avatar)/#i', $rel)) {
-        return '';
-    }
-    return $rel;
+    return $real;
 }
 
 /**
- * 解析附件在磁盘上的真实路径
- * 兼容系统附件与本插件两种 ul_Name 存储格式：
- *  - zb_users/upload/... （站点根相对）
- *  - upload/...          （zb_users 相对，系统附件管理常见）
- *  - 纯文件名            （个别上传流程只存文件名，按上传目录逐层探测）
+ * 判断是否为系统标准 ul_Name 存储格式（仅文件名，无路径前缀）
+ * 标准记录的 FullFile/Url/DelFile 均可直接使用系统属性
+ */
+function media_library_is_standard_name($name)
+{
+    $name = str_replace('\\', '/', trim((string) $name));
+    if ($name === '' || preg_match('#^https?://#i', $name)) {
+        return false;
+    }
+    return strpos($name, '/') === false;
+}
+
+/**
+ * 解析附件在磁盘上的真实路径（接收 Upload 对象）
+ * 标准记录（ul_Name 仅文件名）：直接使用对象 FullFile（Dir 按上传时间推导，兼容云存储接管与系统目录设置）
+ * 历史记录（本插件旧版把 zb_users/upload/... 或 upload/... 整段存入 ul_Name）：按前缀直达，不再逐层猜测
  * 找不到返回 ''；结果必须落在 zb_users/upload/ 内（realpath 包含校验，防穿越）
  */
-function media_library_disk_path($name)
+function media_library_disk_path($u)
 {
     global $zbp;
-    $name = str_replace('\\', '/', trim((string) $name));
-    $name = ltrim($name, '/');
-    if ($name === '' || strpos($name, '..') !== false || strpos($name, "\0") !== false) {
-        return '';
-    }
-
-    $cands = array($name);
-    if (strpos($name, 'zb_users/') === 0) {
-        $cands[] = substr($name, 9);
-    } elseif (strpos($name, 'upload/') === 0) {
-        $cands[] = 'zb_users/' . $name;
-    } else {
-        $m = date('Y');
-        $cands[] = 'zb_users/upload/' . date('Y/m') . '/' . $name;
-        $cands[] = 'zb_users/upload/' . $name;
-        $cands[] = 'upload/' . date('Y/m') . '/' . $name;
-        $cands[] = 'upload/' . $name;
-    }
-
     $uploadRoot = @realpath($zbp->usersdir . 'upload');
     if ($uploadRoot === false || $uploadRoot === '') {
         return '';
     }
-    foreach ($cands as $c) {
-        if ($c === '') {
-            continue;
-        }
-        foreach (array($zbp->path, $zbp->usersdir) as $base) {
-            $real = @realpath($base . $c);
-            if ($real !== false && $real !== '' && strpos($real, $uploadRoot) === 0 && @is_file($real)) {
-                return $real;
-            }
-        }
+
+    // 1) 系统标准：FullFile = usersdir + Dir + Name
+    $file = media_library_realpath_in_upload($u->FullFile, $uploadRoot);
+    if ($file !== '') {
+        return $file;
+    }
+
+    // 2) 历史格式兼容
+    $name = str_replace('\\', '/', trim((string) $u->Name));
+    $name = ltrim($name, '/');
+    if ($name === '' || strpos($name, '..') !== false || strpos($name, "\0") !== false) {
+        return '';
+    }
+    if (strpos($name, 'zb_users/upload/') === 0) {
+        return media_library_realpath_in_upload($zbp->path . $name, $uploadRoot);
+    }
+    if (strpos($name, 'upload/') === 0) {
+        return media_library_realpath_in_upload($zbp->usersdir . $name, $uploadRoot);
     }
     return '';
 }
 
 /**
- * 附件的访问 URL（兼容不同 ul_Name 存储格式）
+ * 附件的访问 URL
+ * 标准记录：直接使用系统 $u->Url（内置 rawurlencode 与云存储接管 hook）
+ * 历史记录：按存储前缀归一为站点根相对路径后逐段 rawurlencode（修复中文/空格文件名坏链）
  */
+function media_library_raw_path_url($siteRelPath)
+{
+    global $zbp;
+    $parts = explode('/', str_replace('\\', '/', ltrim((string) $siteRelPath, '/')));
+    $enc = array_map('rawurlencode', $parts);
+    return $zbp->host . implode('/', $enc);
+}
+
 function media_library_upload_url($u)
 {
     global $zbp;
@@ -1042,9 +1041,12 @@ function media_library_upload_url($u)
         return $name; // 个别流程直接存完整 URL
     }
     if (stripos($name, 'zb_users/') === 0) {
-        return $zbp->host . $name;
+        return media_library_raw_path_url($name); // 历史格式：站点根相对
     }
-    return $zbp->host . 'zb_users/' . $name;
+    if (stripos($name, 'upload/') === 0) {
+        return media_library_raw_path_url('zb_users/' . $name); // 历史格式：zb_users 相对
+    }
+    return $u->Url; // 标准格式：系统属性
 }
 
 /**
@@ -1233,35 +1235,43 @@ function media_library_save_one($fileInfo, $logid)
         }
     }
 
-    // 上传目录：zb_users/upload/Y/m/
-    $subdir = 'zb_users/upload/' . date('Y') . '/' . date('m') . '/';
-    $dir = $zbp->path . $subdir;
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
+    // 附件对象：存储格式对齐系统标准（ul_Name 仅存文件名，目录由对象 Dir 推导）
+    $u = new Upload();
+    $u->PostTime = time();
+    $u->Name = $base . '.' . $ext;
+    $dirAbs = $zbp->usersdir . $u->Dir; // Dir 由对象按上传时间推导（含 ZC_UPLOAD_DIR_* 与云存储接管 hook）
+    if (!is_dir($dirAbs)) {
+        @mkdir($dirAbs, 0755, true);
     }
-    if (!is_dir($dir)) {
-        media_library_error('上传目录创建失败：' . $subdir);
-    }
-
-    // 冲突处理
-    $target = $base . '.' . $ext;
-    if (file_exists($dir . $target)) {
-        $target = $base . '_' . date('dHis') . '_' . mt_rand(100, 999) . '.' . $ext;
+    if (!is_dir($dirAbs)) {
+        media_library_error('上传目录创建失败：' . $u->Dir);
     }
 
-    if (!@move_uploaded_file($fileInfo['tmp_name'], $dir . $target)) {
+    // Windows 主机按系统字符集转码落盘（与系统 SaveFile 行为一致，DB 中仍存 UTF-8 名）
+    $toDiskName = function ($name) use ($zbp) {
+        if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
+            $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $name);
+            if (is_string($conv) && $conv !== '') {
+                return $conv;
+            }
+        }
+        return $name;
+    };
+
+    // 同名冲突处理
+    if (file_exists($dirAbs . $toDiskName($u->Name))) {
+        $u->Name = $base . '_' . date('dHis') . '_' . mt_rand(100, 999) . '.' . $ext;
+    }
+
+    if (!@move_uploaded_file($fileInfo['tmp_name'], $dirAbs . $toDiskName($u->Name))) {
         media_library_error('文件保存失败，请检查目录写入权限');
     }
-    @chmod($dir . $target, 0644);
+    @chmod($dirAbs . $toDiskName($u->Name), 0644);
 
-    $mime = media_library_detect_mime($dir . $target, $ext);
-
-    $u = new Upload();
-    $u->Name = $subdir . $target;
+    $mime = media_library_detect_mime($dirAbs . $toDiskName($u->Name), $ext);
     $u->SourceName = $show;
-    $u->Size = (int) @filesize($dir . $target);
+    $u->Size = (int) @filesize($dirAbs . $toDiskName($u->Name));
     $u->MimeType = $mime;
-    $u->PostTime = time();
     $u->AuthorID = (int) $zbp->user->ID;
     $u->LogID = max(0, (int) $logid);
     $u->Save();

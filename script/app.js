@@ -225,6 +225,15 @@
 				o.textContent = a.name + '（' + a.count + '）';
 				author.appendChild(o);
 			});
+
+			// 重建后回填当前筛选值：DOM 归零但 state 仍保留，若不回填会出现「界面显示全部、实际仍在过滤」的错觉
+			// 选项已不存在时（如分类被删）同步重置 state，保持两者一致
+			if (cate.value !== String(state.cateid == null ? '' : state.cateid)) { state.cateid = ''; }
+			cate.value = String(state.cateid);
+			if (month.value !== String(state.month == null ? '' : state.month)) { state.month = ''; }
+			month.value = String(state.month);
+			if (author.value !== String(state.authorid == null ? '' : state.authorid)) { state.authorid = ''; }
+			author.value = String(state.authorid);
 		});
 	}
 

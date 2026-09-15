@@ -114,8 +114,13 @@ if ($act == 'replace') {
             media_library_error('文件内容不是有效图片：' . $orig);
         }
     }
+    // 替换不改变附件地址，因此类型必须与原附件一致（防止 .jpg 记录被换成其他类型内容）
+    $origExt = strtolower(pathinfo($u->Name, PATHINFO_EXTENSION));
+    if ($origExt !== '' && $ext !== $origExt) {
+        media_library_error('替换文件类型（.' . $ext . '）需与原附件（.' . $origExt . '）一致；如需其他类型请删除后重新上传');
+    }
     // 目标文件必须真实存在且落在附件目录内（防止记录被篡改后越权覆盖文件）
-    $target = media_library_disk_path($u->Name);
+    $target = media_library_disk_path($u);
     if ($target === '') {
         media_library_error('未找到原附件文件，无法替换（可删除后重新上传）');
     }
@@ -218,9 +223,14 @@ if ($act == 'delete') {
     if ($u->ID == 0) {
         media_library_error('附件不存在');
     }
-    $disk = media_library_disk_path($u->Name);
-    if ($disk !== '') {
-        @unlink($disk);
+    // 标准记录走系统 DelFile()（兼容云存储接管插件）；历史前缀记录 FullFile 指向不正确，按兼容路径删
+    if (media_library_is_standard_name($u->Name)) {
+        $u->DelFile();
+    } else {
+        $disk = media_library_disk_path($u);
+        if ($disk !== '') {
+            @unlink($disk);
+        }
     }
     media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
     $u->Del();
