@@ -107,18 +107,18 @@
 		xhr.send();
 	}
 
-	function apiPost(formData, cb) {
+	function apiPost(formData, cb, onFail) {
 		formData.append('csrfToken', ML.csrfToken || '');
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', ML.api, true);
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState !== 4) return;
-			handleJson(xhr, cb);
+			handleJson(xhr, cb, onFail);
 		};
 		xhr.send(formData);
 	}
 
-	function handleJson(xhr, cb) {
+	function handleJson(xhr, cb, onFail) {
 		var data;
 		try {
 			data = JSON.parse(xhr.responseText);
@@ -133,10 +133,12 @@
 			} else {
 				toast('请求失败（HTTP ' + xhr.status + '）', true);
 			}
+			if (onFail) onFail();
 			return;
 		}
 		if (data.code !== 0) {
 			toast(data.msg || '操作失败', true);
+			if (onFail) onFail();
 			return;
 		}
 		if (cb) cb(data.data);
@@ -260,7 +262,7 @@
 		if (item.kind === 'image' && item.exists) {
 			inner = '<img src="' + esc(item.url) + '" alt="' + esc(item.alt || item.name) + '" loading="lazy">';
 		} else if (item.kind === 'video' && item.exists) {
-			inner = '<img src="" alt=""><div class="mlx-fileicon"><div class="mlx-icon">▶</div>' + esc(kindIconText(item.kind, item.name)) + '</div>';
+			inner = '<div class="mlx-fileicon"><div class="mlx-icon">▶</div>' + esc(kindIconText(item.kind, item.name)) + '</div>';
 		} else {
 			inner = '<div class="mlx-fileicon"><div class="mlx-icon">' + esc(kindIconText(item.kind, item.name)) + '</div></div>';
 		}
@@ -503,7 +505,12 @@
 			apiPost(fd, function (d) {
 				toast('已保存');
 				state.current = d;
-				refreshItem(d);
+				// 关联状态变化影响「使用状态 / 未关联附件」筛选结果：处于这些筛选时重新拉列表，否则就地更新
+				if (state.used !== '' || state.cateid === 'none') {
+					loadList();
+				} else {
+					refreshItem(d);
+				}
 				loadStats();
 			});
 		});
@@ -657,6 +664,7 @@
 
 	// ---------- 弹窗（批量关联） ----------
 	function showBindModal() {
+		if ($('ml-modal')) return; // 防止快速双击叠出重复弹窗
 		var mask = el('div', 'mlx-modal-mask');
 		mask.id = 'ml-modal';
 		mask.innerHTML =
@@ -787,11 +795,11 @@
 			var ids = [];
 			for (var key in state.selected) if (state.selected.hasOwnProperty(key)) ids.push(key);
 			// 分批请求：单次删除过多会触发 PHP 执行超时，服务端返回非 JSON 会被误判
-			var CHUNK = 20, done = 0, skipped = 0, pos = 0;
+			var CHUNK = 20, done = 0, skipped = 0, failed = 0, pos = 0;
 			var next = function () {
 				var part = ids.slice(pos, pos + CHUNK);
 				if (!part.length) {
-					toast('已删除 ' + done + ' 个附件' + (skipped ? '，' + skipped + ' 个已跳过' : ''));
+					toast('已删除 ' + done + ' 个附件' + (skipped ? '，' + skipped + ' 个已跳过' : '') + (failed ? '，' + failed + ' 个删除失败，可重试' : ''), !!failed);
 					state.selected = {};
 					loadList();
 					loadStats();
@@ -805,6 +813,10 @@
 				apiPost(fd, function (d) {
 					done += (d && d.done) || 0;
 					skipped += (d && d.skipped) || 0;
+					next();
+				}, function () {
+					// 单批失败不中断后续批次，最后汇总提示
+					failed += part.length;
 					next();
 				});
 			};
