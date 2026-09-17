@@ -15,6 +15,8 @@ function ActivePlugin_at8_media_library()
     Add_Filter_Plugin('Filter_Plugin_Admin_TopMenu', 'media_library_AddTopMenu');
     // 系统自带「附件管理」页面右上角加入口
     Add_Filter_Plugin('Filter_Plugin_Admin_UploadMng_SubMenu', 'media_library_UploadMngSubMenu');
+    // 文章/页面编辑页右栏「文章配图」面板
+    Add_Filter_Plugin('Filter_Plugin_Edit_Response3', 'media_library_edit_panel');
 }
 
 function media_library_AddLeftMenu(&$m)

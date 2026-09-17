@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.2.3');
+    define('MEDIA_LIBRARY_VERSION', '1.2.2');
 }
 
 /**
@@ -1408,3 +1408,192 @@ function media_library_audit($text)
         Logs('[media_library] ' . $text);
     }
 }
+
+/**
+ * 文章/页面编辑页右栏「文章配图」面板（Filter_Plugin_Edit_Response3）
+ * 弹窗内列出关联到本文的图片并支持一键插入编辑器正文
+ * （经 editor_api.editor.content.insert 官方接口，兼容 UEditor 等全部编辑器）
+ */
+function media_library_edit_panel()
+{
+    global $zbp;
+    if (!media_library_can_view()) {
+        return;
+    }
+    $api = $zbp->host . 'zb_users/plugin/at8_media_library/api.php';
+    $css = $zbp->host . 'zb_users/plugin/at8_media_library/css/style.css?v=' . MEDIA_LIBRARY_VERSION;
+    $token = method_exists($zbp, 'GetCSRFToken') ? $zbp->GetCSRFToken() : '';
+    $safe = array(JSON_UNESCAPED_UNICODE, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    $apiJs = json_encode($api, $safe[0] | $safe[1]);
+    $tokenJs = json_encode($token, $safe[0] | $safe[1]);
+    $cssHtml = htmlspecialchars($css);
+    $canUpload = ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root')) ? 1 : 0;
+
+    echo '<link rel="stylesheet" href="' . $cssHtml . '">' . "\n";
+    echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章配图</label>';
+    echo '<div style="margin-top:4px"><button type="button" class="button" id="ml-edit-open">管理 / 插入配图</button>';
+    if ($canUpload) {
+        echo ' <button type="button" class="button" id="ml-edit-upload">上传图片</button>';
+    }
+    echo '</div></div>' . "\n";
+
+    echo '<div class="mlx-modal-mask" id="ml-edit-mask" style="display:none">'
+        . '<div class="mlx-modal" style="width:760px;max-width:94vw">'
+        . '<div class="mlx-modal-head" style="display:flex;justify-content:space-between;align-items:center">'
+        . '<span id="ml-edit-modal-title">文章配图</span>'
+        . '<button type="button" class="button" id="ml-edit-close" style="padding:2px 10px">关闭</button>'
+        . '</div>'
+        . '<div class="mlx-modal-body" id="ml-edit-body" style="max-height:64vh;overflow:auto">加载中…</div>'
+        . '</div></div>' . "\n";
+    ?>
+<script>
+(function () {
+	var API = <?php echo $apiJs; ?>;
+	var TOKEN = <?php echo $tokenJs; ?>;
+	function $(id) { return document.getElementById(id); }
+	function esc(s) {
+		return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+		});
+	}
+	function postId() {
+		var el = $('edtID');
+		var v = el ? parseInt(el.value, 10) : 0;
+		return isNaN(v) ? 0 : v;
+	}
+	function postTitle() {
+		var el = $('edtTitle');
+		return el ? el.value : '';
+	}
+	function api(data, cb) {
+		data.csrfToken = TOKEN;
+		var fd = new FormData();
+		for (var k in data) if (data.hasOwnProperty(k)) fd.append(k, data[k]);
+		var x = new XMLHttpRequest();
+		x.open('POST', API, true);
+		x.onreadystatechange = function () {
+			if (x.readyState !== 4) return;
+			var d = null;
+			try { d = JSON.parse(x.responseText); } catch (e) { }
+			if (d && d.code === 0) {
+				cb(d.data);
+			} else {
+				$('ml-edit-body').innerHTML = '<div style="padding:14px;color:#c0392b">' +
+					esc((d && d.msg) || ('请求失败（HTTP ' + x.status + '）')) + '</div>';
+			}
+		};
+		x.send(fd);
+	}
+	function insertHtml(html) {
+		try {
+			if (window.editor_api && editor_api.editor && editor_api.editor.content && editor_api.editor.content.insert) {
+				editor_api.editor.content.insert(html);
+			} else if (window.UE && UE.getEditor) {
+				UE.getEditor('editor_content').execCommand('inserthtml', html);
+			} else {
+				alert('未找到编辑器插入接口，请通过「复制 URL」手动插入');
+			}
+		} catch (e) {
+			alert('插入失败：' + e.message);
+		}
+	}
+	function render(items) {
+		var imgs = [], other = 0;
+		for (var i = 0; i < items.length; i++) {
+			if (items[i].kind === 'image') imgs.push(items[i]); else other++;
+		}
+		if (!imgs.length) {
+			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">本文还没有关联图片。可在「媒体库」中关联，或经编辑器上传（自动关联本文）。</div>';
+			return;
+		}
+		var h = '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
+		for (var j = 0; j < imgs.length; j++) {
+			var it = imgs[j];
+			var badge = (typeof it.quoted === 'undefined') ? '' :
+				(it.quoted ? '<span style="color:#1a9e55">✅ 已引用</span>' : '<span style="color:#c07f00">⚠️ 未引用</span>');
+			h += '<div style="width:150px;border:1px solid #e3e9f2;border-radius:8px;padding:6px;box-sizing:border-box">'
+				+ '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;text-align:center">'
+				+ '<img src="' + esc(it.url) + '" style="max-width:100%;max-height:84px" alt=""></div>'
+				+ '<div style="font-size:12px;margin:5px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(it.name) + '">' + esc(it.name) + '</div>'
+				+ '<div style="font-size:11px;color:#93a1b5;display:flex;justify-content:space-between"><span>' + esc(it.size_text) + '</span>' + badge + '</div>'
+				+ '<button type="button" class="button" style="margin-top:5px;width:100%;padding:2px 0" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
+				+ '</div>';
+		}
+		h += '</div>';
+		if (other > 0) h += '<div style="padding:4px 6px;font-size:12px;color:#93a1b5">另有 ' + other + ' 个非图片附件（在「媒体库」中查看）</div>';
+		$('ml-edit-body').innerHTML = h;
+		var btns = $('ml-edit-body').querySelectorAll('button[data-url]');
+		for (var k = 0; k < btns.length; k++) {
+			btns[k].addEventListener('click', function () {
+				var url = this.getAttribute('data-url');
+				var alt = this.getAttribute('data-alt');
+				insertHtml('<p><img src="' + url + '" alt="' + alt + '"></p>');
+			});
+		}
+	}
+	function load() {
+		var pid = postId();
+		if (!pid) {
+			$('ml-edit-modal-title').textContent = '文章配图';
+			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">请先保存文章，再管理配图。</div>';
+			return;
+		}
+		$('ml-edit-modal-title').textContent = '文章配图 #' + pid + ' ' + postTitle();
+		$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">加载中…</div>';
+		api({ act: 'list', logid: pid, kind: 'image', perpage: 200, orderby: 'time' }, function (d) {
+			render(d.list || []);
+		});
+	}
+	$('ml-edit-open').addEventListener('click', function (e) {
+		e.preventDefault();
+		$('ml-edit-mask').style.display = 'flex';
+		load();
+	});
+	var up = $('ml-edit-upload');
+	if (up) up.addEventListener('click', function (e) {
+		e.preventDefault();
+		var pid = postId();
+		if (!pid) { alert('请先保存文章，再上传配图。'); return; }
+		var inp = document.createElement('input');
+		inp.type = 'file';
+		inp.accept = 'image/*';
+		inp.multiple = true;
+		inp.onchange = function () {
+			var files = inp.files;
+			if (!files.length) return;
+			var done = 0, fail = 0, last = null;
+			for (var i = 0; i < files.length; i++) {
+				(function (f) {
+					var fd = new FormData();
+					fd.append('act', 'upload');
+					fd.append('csrfToken', TOKEN);
+					fd.append('logid', pid);
+					fd.append('files', f, f.name);
+					var x = new XMLHttpRequest();
+					x.open('POST', API, true);
+					x.onreadystatechange = function () {
+						if (x.readyState !== 4) return;
+						var d = null;
+						try { d = JSON.parse(x.responseText); } catch (err) { }
+						if (d && d.code === 0) { done++; last = d.data; } else { fail++; }
+						if (done + fail === files.length) {
+							alert('上传完成：成功 ' + done + ' 个' + (fail ? '，失败 ' + fail + ' 个' : ''));
+							if (last) insertHtml('<p><img src="' + last.url + '" alt="' + esc(last.alt || last.name) + '"></p>');
+							load();
+						}
+					};
+					x.send(fd);
+				})(files[i]);
+			}
+		};
+		inp.click();
+	});
+	$('ml-edit-close').addEventListener('click', function () { $('ml-edit-mask').style.display = 'none'; });
+	$('ml-edit-mask').addEventListener('click', function (e) {
+		if (e.target === this) this.style.display = 'none';
+	});
+})();
+</script>
+	<?php
+}
+
