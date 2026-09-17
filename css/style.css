@@ -234,7 +234,10 @@
 
 .mlx-thumb img {
 	position: absolute;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
@@ -243,7 +246,10 @@
 
 .mlx-thumb .mlx-fileicon {
 	position: absolute;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -472,7 +478,10 @@
 .mlx-drawer-mask {
 	display: none;
 	position: fixed;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	background: rgba(15, 23, 35, .35);
 	z-index: 8990;
 }
@@ -734,7 +743,10 @@
 .mlx-dropzone-tip {
 	display: none;
 	position: fixed;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	background: rgba(42, 92, 245, .08);
 	border: 3px dashed #2a5cf5;
 	z-index: 8999;
@@ -754,7 +766,10 @@
 .mlx-lightbox {
 	display: none;
 	position: fixed;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	background: rgba(10, 14, 22, .88);
 	z-index: 8998;
 }
@@ -765,7 +780,10 @@
 
 .mlx-lb-inner {
 	position: absolute;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -826,7 +844,10 @@
 /* ---------- 弹窗（批量关联） ---------- */
 .mlx-modal-mask {
 	position: fixed;
-	inset: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
 	background: rgba(15, 23, 35, .45);
 	z-index: 8996;
 	display: flex;

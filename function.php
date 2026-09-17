@@ -1431,19 +1431,46 @@ function media_library_edit_panel()
 
     echo '<link rel="stylesheet" href="' . $cssHtml . '">' . "\n";
     echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章配图</label>';
-    echo '<div style="margin-top:4px"><button type="button" class="button" id="ml-edit-open">管理 / 插入配图</button>';
+    echo '<div class="ml-panel-btns">'
+        . '<button type="button" class="ml-panel-btn ml-panel-btn-primary" id="ml-edit-open">'
+        . '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
+        . '<span>管理 / 插入配图</span></button>';
     if ($canUpload) {
-        echo ' <button type="button" class="button" id="ml-edit-upload">上传图片</button>';
+        echo '<button type="button" class="ml-panel-btn" id="ml-edit-upload">'
+            . '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg>'
+            . '<span>上传图片</span></button>';
     }
     echo '</div></div>' . "\n";
 
-    echo '<div class="mlx-modal-mask" id="ml-edit-mask" style="display:none">'
-        . '<div class="mlx-modal" style="width:760px;max-width:94vw">'
-        . '<div class="mlx-modal-head" style="display:flex;justify-content:space-between;align-items:center">'
-        . '<span id="ml-edit-modal-title">文章配图</span>'
-        . '<button type="button" class="button" id="ml-edit-close" style="padding:2px 10px">关闭</button>'
+    // 弹窗样式独立作用域（ID 选择器 + 显式四边定位 + 高 z-index），不依赖后台环境样式
+    echo '<style id="ml-edit-style">' . "\n"
+        . '#ml-edit-panel .ml-panel-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}' . "\n"
+        . '#ml-edit-panel .ml-panel-btn{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;font-family:inherit;font-size:13px;line-height:1.4;padding:7px 14px;border-radius:8px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;text-decoration:none;transition:all .15s;vertical-align:middle}' . "\n"
+        . '#ml-edit-panel .ml-panel-btn:hover{border-color:#2a5cf5;color:#2a5cf5;text-decoration:none}' . "\n"
+        . '#ml-edit-panel .ml-panel-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff;box-shadow:0 2px 8px rgba(42,92,245,.30)}' . "\n"
+        . '#ml-edit-panel .ml-panel-btn-primary:hover{background:#1f4ae0;color:#fff;box-shadow:0 4px 12px rgba(42,92,245,.38)}' . "\n"
+        . '#ml-edit-panel .ml-panel-btn svg{flex:0 0 auto}' . "\n"
+        . '#ml-edit-mask{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;background:rgba(9,14,25,.55);z-index:99999;display:none;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}' . "\n"
+        . '#ml-edit-mask.mlx-open{display:flex}' . "\n"
+        . '#ml-edit-mask .mlx-modal{display:flex;flex-direction:column;background:#fff;border-radius:14px;width:780px;max-width:96vw;max-height:86vh;box-shadow:0 24px 70px rgba(9,14,25,.35);overflow:hidden;font-family:inherit}' . "\n"
+        . '#ml-edit-mask .mlx-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;background:#f7f9fd;border-bottom:1px solid #eef1f7;font-size:15px;font-weight:700;color:#1f2d3d}' . "\n"
+        . '#ml-edit-mask .mlx-modal-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' . "\n"
+        . '#ml-edit-mask .mlx-modal-close{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:12px;line-height:1;padding:6px 10px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#5b6b80;cursor:pointer;transition:all .15s}' . "\n"
+        . '#ml-edit-mask .mlx-modal-close:hover{border-color:#e5484d;color:#e5484d;background:#fef2f2}' . "\n"
+        . '#ml-edit-mask .mlx-modal-body{flex:1 1 auto;padding:14px 18px;font-size:13px;color:#3b4a5f;overflow:auto}' . "\n"
+        . '#ml-edit-mask .mlx-btn{display:inline-block;font-family:inherit;font-size:12px;line-height:1.4;padding:5px 12px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;transition:all .15s}' . "\n"
+        . '#ml-edit-mask .mlx-btn:hover{border-color:#2a5cf5;color:#2a5cf5}' . "\n"
+        . '#ml-edit-mask .mlx-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff}' . "\n"
+        . '#ml-edit-mask .mlx-btn-primary:hover{background:#1f4ae0;color:#fff}' . "\n"
+        . '</style>' . "\n";
+
+    echo '<div id="ml-edit-mask">'
+        . '<div class="mlx-modal">'
+        . '<div class="mlx-modal-head">'
+        . '<span class="mlx-modal-title" id="ml-edit-modal-title">文章配图</span>'
+        . '<button type="button" class="mlx-modal-close" id="ml-edit-close"><span>✕</span><span>关闭</span></button>'
         . '</div>'
-        . '<div class="mlx-modal-body" id="ml-edit-body" style="max-height:64vh;overflow:auto">加载中…</div>'
+        . '<div class="mlx-modal-body" id="ml-edit-body">加载中…</div>'
         . '</div></div>' . "\n";
     ?>
 <script>
@@ -1516,7 +1543,7 @@ function media_library_edit_panel()
 				+ '<img src="' + esc(it.url) + '" style="max-width:100%;max-height:84px" alt=""></div>'
 				+ '<div style="font-size:12px;margin:5px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(it.name) + '">' + esc(it.name) + '</div>'
 				+ '<div style="font-size:11px;color:#93a1b5;display:flex;justify-content:space-between"><span>' + esc(it.size_text) + '</span>' + badge + '</div>'
-				+ '<button type="button" class="button" style="margin-top:5px;width:100%;padding:2px 0" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
+				+ '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
 				+ '</div>';
 		}
 		h += '</div>';
@@ -1544,10 +1571,16 @@ function media_library_edit_panel()
 			render(d.list || []);
 		});
 	}
+	function openMask() {
+		$('ml-edit-mask').classList.add('mlx-open');
+		load();
+	}
+	function closeMask() {
+		$('ml-edit-mask').classList.remove('mlx-open');
+	}
 	$('ml-edit-open').addEventListener('click', function (e) {
 		e.preventDefault();
-		$('ml-edit-mask').style.display = 'flex';
-		load();
+		openMask();
 	});
 	var up = $('ml-edit-upload');
 	if (up) up.addEventListener('click', function (e) {
@@ -1588,9 +1621,12 @@ function media_library_edit_panel()
 		};
 		inp.click();
 	});
-	$('ml-edit-close').addEventListener('click', function () { $('ml-edit-mask').style.display = 'none'; });
+	$('ml-edit-close').addEventListener('click', closeMask);
 	$('ml-edit-mask').addEventListener('click', function (e) {
-		if (e.target === this) this.style.display = 'none';
+		if (e.target === this) closeMask();
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && $('ml-edit-mask').classList.contains('mlx-open')) closeMask();
 	});
 })();
 </script>
