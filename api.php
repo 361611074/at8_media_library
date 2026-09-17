@@ -53,6 +53,16 @@ if ($act == 'posts') {
     media_library_ok($out);
 }
 
+// 引用检测：关联文章正文是否实际引用该附件（详情抽屉用，只读）
+if ($act == 'quotecheck') {
+    $id = (int) GetVars('id', 'REQUEST');
+    $u = $zbp->GetUploadByID($id);
+    if ($u->ID == 0) {
+        media_library_error('附件不存在');
+    }
+    media_library_ok(media_library_quote_state($u));
+}
+
 // 上传（支持多文件、拖拽）
 if ($act == 'upload') {
     media_library_check_csrf();

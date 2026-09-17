@@ -394,7 +394,8 @@
 			'<tr><td>上传时间</td><td>' + esc(item.date_text) + '</td></tr>' +
 			'<tr><td>上传者</td><td>' + esc(item.author) + '</td></tr>' +
 			'<tr><td>文件状态</td><td>' + (item.exists ? '正常' : '<span class="mlx-missing">文件缺失（记录存在但文件已被删除）</span>') + '</td></tr>' +
-			'<tr><td>关联文章</td><td>' + (item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</td></tr>';
+			'<tr><td>关联文章</td><td>' + (item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</td></tr>' +
+			'<tr><td>引用状态</td><td id="ml-dw-quote">' + (item.logid > 0 ? '检测中…' : '—（未关联）') + '</td></tr>';
 
 		dw.innerHTML =
 			'<div class="mlx-dw-head"><b title="' + esc(item.name) + '">' + esc(item.name) + '</b>' +
@@ -434,6 +435,24 @@
 
 		var img = $('ml-dw-img');
 		if (img) img.addEventListener('click', function () { openLightbox(id); });
+
+		// 引用检测：关联文章的正文中是否实际引用了该附件
+		if (item.logid > 0) {
+			var qfd = new FormData();
+			qfd.append('act', 'quotecheck');
+			qfd.append('id', item.id);
+			apiPost(qfd, function (q) {
+				var cell = $('ml-dw-quote');
+				if (!cell) return; // 抽屉已关闭
+				if (q && q.state === 'missing') {
+					cell.innerHTML = '<span class="mlx-missing">关联的文章不存在（可能已删除）</span>';
+				} else if (q && q.quoted) {
+					cell.innerHTML = '✅ 已在正文引用';
+				} else {
+					cell.innerHTML = '<span style="color:#b8860b">⚠️ 仅关联未引用</span>';
+				}
+			});
+		}
 
 		$('ml-dw-copyurl').addEventListener('click', function () { copyText(item.url, 'URL 已复制'); });
 		$('ml-dw-copyhtml').addEventListener('click', function () {

@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.2.2');
+    define('MEDIA_LIBRARY_VERSION', '1.2.3');
 }
 
 /**
@@ -463,6 +463,42 @@ function media_library_upload_row($u)
     return $row;
 }
 
+/**
+ * 引用匹配：判断文章正文内容中是否出现了该附件的文件名
+ * 同时匹配原始文件名与 rawurlencode 后的形式（兼容中文文件名的正文 URL）
+ */
+function media_library_quote_match($name, $content)
+{
+    $base = basename(str_replace('\\', '/', (string) $name));
+    $content = (string) $content;
+    if ($base === '' || $content === '') {
+        return false;
+    }
+    if (strpos($content, $base) !== false) {
+        return true;
+    }
+    $enc = rawurlencode($base);
+    return ($enc !== $base && strpos($content, $enc) !== false);
+}
+
+/**
+ * 引用检测：关联文章的正文中是否实际引用了该附件
+ * 返回 null 表示未关联（无需检测）；state: quoted=已引用 linked=仅关联未引用 missing=关联文章不存在
+ */
+function media_library_quote_state($u)
+{
+    global $zbp;
+    if ((int) $u->LogID <= 0) {
+        return null;
+    }
+    $post = $zbp->GetPostByID((int) $u->LogID);
+    if ($post->ID == 0 || (int) $post->ID !== (int) $u->LogID) {
+        return array('checked' => 1, 'quoted' => 0, 'state' => 'missing');
+    }
+    $quoted = media_library_quote_match($u->Name, (string) $post->Content);
+    return array('checked' => 1, 'quoted' => $quoted ? 1 : 0, 'state' => $quoted ? 'quoted' : 'linked');
+}
+
 function media_library_size_text($size)
 {
     if ($size >= 1048576) {
@@ -893,6 +929,16 @@ function media_library_list($p)
             $u->ml_cate_name = media_library_cate_name($cid);
         }
         $rows[] = media_library_upload_row($u);
+    }
+
+    // 按文章过滤时附带引用检测结果（正文是否实际引用该附件；正文只取一次，逐行匹配文件名）
+    $logidFilter = isset($p['logid']) ? (int) $p['logid'] : 0;
+    if ($logidFilter > 0) {
+        $post = $zbp->GetPostByID($logidFilter);
+        $content = ($post->ID > 0 && (int) $post->ID === $logidFilter) ? (string) $post->Content : '';
+        foreach ($rows as $k => $row) {
+            $rows[$k]['quoted'] = media_library_quote_match($row['path'], $content) ? 1 : 0;
+        }
     }
 
     return array(
