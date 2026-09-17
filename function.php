@@ -179,6 +179,7 @@ function media_library_kind_where($kind)
         array('LIKE', 'ul_Name', '%.gif'),
         array('LIKE', 'ul_Name', '%.webp'),
         array('LIKE', 'ul_Name', '%.bmp'),
+        array('LIKE', 'ul_Name', '%.svg'),
         array('LIKE', 'ul_Name', '%.ico'),
     );
     $vid = array('OR',
@@ -1642,11 +1643,11 @@ function media_library_edit_panel()
     $cssHtml = htmlspecialchars($css);
 
     echo '<link rel="stylesheet" href="' . $cssHtml . '">' . "\n";
-    echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章配图</label>';
+    echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章附件</label>';
     echo '<div class="ml-panel-btns">'
         . '<button type="button" class="ml-panel-btn ml-panel-btn-primary" id="ml-edit-open">'
         . '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
-        . '<span>管理 / 插入配图</span></button>'
+        . '<span>管理 / 插入附件</span></button>'
         . '</div></div>' . "\n";
 
     // 弹窗样式独立作用域（ID 选择器 + 显式四边定位 + 高 z-index），不依赖后台环境样式
@@ -1675,7 +1676,7 @@ function media_library_edit_panel()
     echo '<div id="ml-edit-mask">'
         . '<div class="mlx-modal">'
         . '<div class="mlx-modal-head">'
-        . '<span class="mlx-modal-title" id="ml-edit-modal-title">文章配图</span>'
+        . '<span class="mlx-modal-title" id="ml-edit-modal-title">文章附件</span>'
         . '<button type="button" class="mlx-modal-close" id="ml-edit-close"><span>✕</span><span>关闭</span></button>'
         . '</div>'
         . '<div class="mlx-modal-body" id="ml-edit-body">加载中…</div>'
@@ -1733,49 +1734,75 @@ function media_library_edit_panel()
 		}
 	}
 	function render(items) {
-		var imgs = [], other = 0;
+		var iconMap = { video: '🎬', audio: '🎵', doc: '📄', archive: '🗜️', other: '📦' };
+		function iconOf(kind) { return iconMap[kind] || '📄'; }
+		var imgs = [], files = [];
 		for (var i = 0; i < items.length; i++) {
-			if (items[i].kind === 'image') imgs.push(items[i]); else other++;
+			if (items[i].kind === 'image') imgs.push(items[i]); else files.push(items[i]);
 		}
-		if (!imgs.length) {
-			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">本文还没有关联图片。可在「媒体库」中关联，或经编辑器上传（自动关联本文）。</div>';
+		if (!imgs.length && !files.length) {
+			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">本文还没有关联附件。可在「媒体库」中关联，或经编辑器上传（自动关联本文）。</div>';
 			return;
 		}
-		var h = '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
-		for (var j = 0; j < imgs.length; j++) {
-			var it = imgs[j];
+		function card(it, isImg) {
 			var badge = (typeof it.quoted === 'undefined') ? '' :
 				(it.quoted ? '<span style="color:#1a9e55">✅ 已引用</span>' : '<span style="color:#c07f00">⚠️ 未引用</span>');
-			h += '<div style="width:150px;border:1px solid #e3e9f2;border-radius:8px;padding:6px;box-sizing:border-box">'
-				+ '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;text-align:center">'
-				+ '<img src="' + esc(it.url) + '" style="max-width:100%;max-height:84px" alt=""></div>'
+			var inner;
+			if (isImg) {
+				inner = '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;text-align:center">'
+					+ '<img src="' + esc(it.url) + '" style="max-width:100%;max-height:84px" alt=""></div>';
+			} else {
+				inner = '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">'
+					+ '<span style="font-size:22px;line-height:1">' + esc(iconOf(it.kind)) + '</span>'
+					+ '<span style="font-size:11px;color:#5b6b80">' + esc(it.kind_label) + (it.size_text ? ' · ' + esc(it.size_text) : '') + '</span></div>';
+			}
+			var btn = isImg
+				? '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-mode="img" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
+				: '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-mode="link" data-url="' + esc(it.url) + '" data-alt="' + esc(it.name) + '">插入链接</button>';
+			return '<div style="width:150px;border:1px solid #e3e9f2;border-radius:8px;padding:6px;box-sizing:border-box">'
+				+ inner
 				+ '<div style="font-size:12px;margin:5px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(it.name) + '">' + esc(it.name) + '</div>'
-				+ '<div style="font-size:11px;color:#93a1b5;display:flex;justify-content:space-between"><span>' + esc(it.size_text) + '</span>' + badge + '</div>'
-				+ '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
+				+ '<div style="font-size:11px;color:#93a1b5;display:flex;justify-content:space-between"><span>' + (isImg ? esc(it.size_text) : esc(it.date_text || '')) + '</span>' + badge + '</div>'
+				+ btn
 				+ '</div>';
 		}
-		h += '</div>';
-		if (other > 0) h += '<div style="padding:4px 6px;font-size:12px;color:#93a1b5">另有 ' + other + ' 个非图片附件（在「媒体库」中查看）</div>';
+		var h = '';
+		if (imgs.length) {
+			h += '<div style="padding:2px 6px 6px;font-size:12px;font-weight:700;color:#5b6b80">图片（点击插入正文）</div>';
+			h += '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
+			for (var j = 0; j < imgs.length; j++) h += card(imgs[j], true);
+			h += '</div>';
+		}
+		if (files.length) {
+			h += '<div style="padding:8px 6px 6px;font-size:12px;font-weight:700;color:#5b6b80">其他附件（点击插入下载链接）</div>';
+			h += '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
+			for (var m = 0; m < files.length; m++) h += card(files[m], false);
+			h += '</div>';
+		}
 		$('ml-edit-body').innerHTML = h;
 		var btns = $('ml-edit-body').querySelectorAll('button[data-url]');
 		for (var k = 0; k < btns.length; k++) {
 			btns[k].addEventListener('click', function () {
 				var url = this.getAttribute('data-url');
 				var alt = this.getAttribute('data-alt');
-				insertHtml('<p><img src="' + url + '" alt="' + alt + '"></p>');
+				if (this.getAttribute('data-mode') === 'img') {
+					insertHtml('<p><img src="' + url + '" alt="' + alt + '"></p>');
+				} else {
+					insertHtml('<p><a href="' + url + '" target="_blank">' + alt + '</a></p>');
+				}
 			});
 		}
 	}
 	function load() {
 		var pid = postId();
 		if (!pid) {
-			$('ml-edit-modal-title').textContent = '文章配图';
-			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">请先保存文章，再管理配图。</div>';
+			$('ml-edit-modal-title').textContent = '文章附件';
+			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">请先保存文章，再管理附件。</div>';
 			return;
 		}
-		$('ml-edit-modal-title').textContent = '文章配图 #' + pid + ' ' + postTitle();
+		$('ml-edit-modal-title').textContent = '文章附件 #' + pid + ' ' + postTitle();
 		$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">加载中…</div>';
-		api({ act: 'list', logid: pid, kind: 'image', perpage: 200, orderby: 'time' }, function (d) {
+		api({ act: 'list', logid: pid, perpage: 200, orderby: 'time' }, function (d) {
 			render(d.list || []);
 		});
 	}
