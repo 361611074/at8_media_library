@@ -128,10 +128,11 @@ if ($act == 'replace') {
         media_library_error('替换失败，请检查目录写入权限');
     }
     @chmod($target, 0644);
+    // 注意：不更新 PostTime —— Dir/Url 均由 PostTime 推导，更新会导致附件 URL 变化
+    // 且 FullFile 指向新目录而文件仍在旧目录（跨月替换必现「文件缺失」）
     $u->SourceName = $orig;
     $u->Size = (int) @filesize($target);
     $u->MimeType = media_library_detect_mime($target, $ext);
-    $u->PostTime = time();
     $u->Save();
     media_library_stats_flush();
     media_library_audit('替换附件 #' . $u->ID . ' ' . $u->Name . ' -> ' . $orig);
