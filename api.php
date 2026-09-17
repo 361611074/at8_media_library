@@ -177,22 +177,37 @@ if ($act == 'bulk') {
     }
 
     if ($op == 'delete') {
+        @set_time_limit(0); // 批量删文件可能较慢，避免执行超时中断
         $done = 0;
-        $skip = 0;
-        foreach ($idArr as $id) {
-            $u = $zbp->GetUploadByID($id);
-            if ($u->ID <= 0) {
+        // 一次 IN 查询取回全部附件对象，避免逐条 N+1 查询
+        $sql = $zbp->db->sql->Select(
+            $zbp->table['Upload'],
+            '*',
+            array(array('IN', 'ul_ID', $idArr)),
+            null,
+            null
+        );
+        $res = $zbp->db->Query($sql);
+        foreach ($res as $r) {
+            $u = new Upload();
+            $u->LoadInfoByAssoc($r);
+            if ((int) $u->ID <= 0) {
                 continue;
             }
-            // 找得到磁盘文件才删文件；找不到（记录残留/外部存储）仅删记录
-            $disk = media_library_disk_path($u->Name);
-            if ($disk !== '') {
-                @unlink($disk);
+            // 标准记录走系统 DelFile()（兼容云存储接管插件）；历史前缀记录 FullFile 指向不正确，按兼容路径删
+            if (media_library_is_standard_name($u->Name)) {
+                $u->DelFile();
+            } else {
+                $disk = media_library_disk_path($u);
+                if ($disk !== '') {
+                    @unlink($disk);
+                }
             }
             media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
             $u->Del();
             $done++;
         }
+        $skip = count($idArr) - $done;
         media_library_stats_flush();
         media_library_ok(array('done' => $done, 'skipped' => $skip));
     }

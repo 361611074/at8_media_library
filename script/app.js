@@ -124,7 +124,8 @@
 			data = JSON.parse(xhr.responseText);
 		} catch (e) {
 			var msg = serverErrorText(xhr.responseText);
-			if (xhr.status === 401 || /login/i.test(xhr.responseText || '')) {
+			// 仅凭 HTTP 401 判定登录失效；超时/500 等服务端错误直接展示可读原因
+			if (xhr.status === 401) {
 				toast('登录已失效，请刷新页面重新登录', true);
 			} else if (msg) {
 				toast('服务端错误：' + msg, true);
@@ -785,16 +786,29 @@
 			if (!window.confirm('确定删除选中的 ' + n + ' 个附件？文件与记录将一并删除，不可恢复。')) return;
 			var ids = [];
 			for (var key in state.selected) if (state.selected.hasOwnProperty(key)) ids.push(key);
-			var fd = new FormData();
-			fd.append('act', 'bulk');
-			fd.append('op', 'delete');
-			fd.append('ids', ids.join(','));
-			apiPost(fd, function (d) {
-				toast('已删除 ' + d.done + ' 个附件' + (d.skipped ? '，' + d.skipped + ' 个因路径异常已跳过' : ''));
-				state.selected = {};
-				loadList();
-				loadStats();
-			});
+			// 分批请求：单次删除过多会触发 PHP 执行超时，服务端返回非 JSON 会被误判
+			var CHUNK = 20, done = 0, skipped = 0, pos = 0;
+			var next = function () {
+				var part = ids.slice(pos, pos + CHUNK);
+				if (!part.length) {
+					toast('已删除 ' + done + ' 个附件' + (skipped ? '，' + skipped + ' 个已跳过' : ''));
+					state.selected = {};
+					loadList();
+					loadStats();
+					return;
+				}
+				pos += CHUNK;
+				var fd = new FormData();
+				fd.append('act', 'bulk');
+				fd.append('op', 'delete');
+				fd.append('ids', part.join(','));
+				apiPost(fd, function (d) {
+					done += (d && d.done) || 0;
+					skipped += (d && d.skipped) || 0;
+					next();
+				});
+			};
+			next();
 		});
 
 		// 上传
