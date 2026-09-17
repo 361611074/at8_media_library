@@ -1651,7 +1651,7 @@ function media_library_edit_panel()
 
     // 弹窗样式独立作用域（ID 选择器 + 显式四边定位 + 高 z-index），不依赖后台环境样式
     echo '<style id="ml-edit-style">' . "\n"
-        . '#ml-edit-panel .ml-panel-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}' . "\n"
+        . '#ml-edit-panel .ml-panel-btns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:6px}' . "\n"
         . '#ml-edit-panel .ml-panel-btn{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;font-family:inherit;font-size:13px;line-height:1.4;padding:7px 14px;border-radius:8px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;text-decoration:none;transition:all .15s;vertical-align:middle}' . "\n"
         . '#ml-edit-panel .ml-panel-btn:hover{border-color:#2a5cf5;color:#2a5cf5;text-decoration:none}' . "\n"
         . '#ml-edit-panel .ml-panel-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff;box-shadow:0 2px 8px rgba(42,92,245,.30)}' . "\n"
