@@ -412,7 +412,9 @@
 			'<div class="mlx-ac-list" id="ml-dw-ac" style="display:none"></div>' +
 			'<input type="hidden" id="ml-dw-logid" value="' + item.logid + '">' +
 			'<div style="font-size:12px;color:#93a1b5;margin-top:5px" id="ml-dw-post-cur">当前：' +
-			(item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</div></div>' +
+			(item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</div>' +
+			(item.logid > 0 ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-unlink" style="margin-top:6px">取消关联</button>' : '') +
+			'</div></div>' +
 			'<button type="button" class="mlx-btn mlx-btn-primary mlx-dw-save" id="ml-dw-save">保存修改</button>'
 			: '') +
 			'</div>' +
@@ -474,6 +476,16 @@
 				loadList();
 			});
 		});
+
+		// 取消关联：清空隐藏域，保存时以 logid=0 提交解除关联
+		var unlinkBtn = $('ml-dw-unlink');
+		if (unlinkBtn) {
+			unlinkBtn.addEventListener('click', function () {
+				$('ml-dw-logid').value = '';
+				$('ml-dw-post-cur').textContent = '当前：未关联';
+				unlinkBtn.disabled = true;
+			});
+		}
 
 		$('ml-dw-save').addEventListener('click', function () {
 			var fd = new FormData();
