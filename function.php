@@ -753,6 +753,211 @@ function media_library_authors($scan)
 /**
  * 汇总数据缓存（写入/替换/删除/关联操作后由 media_library_stats_flush() 失效）
  */
+
+/**
+ * ---------- 轻量运行时缓存 ----------
+ * 自动探测可用组件，按优先级启用：
+ *   1. Redis（ext/redis，默认 127.0.0.1:6379，可用插件配置 redis_host/redis_port/redis_auth 覆盖）
+ *   2. APCu（ext/apcu 且已启用）
+ *   3. Opcache 文件缓存（PHP 数组文件 + include，opcache 开启时读取走共享内存）
+ * 任一层不可用自动降级，不影响功能；值一律 JSON/PHP 数组存储，不使用 unserialize。
+ */
+function media_library_cache_redis()
+{
+    global $zbp;
+    static $redis = null, $dead = false;
+    if ($redis !== null) {
+        return $redis;
+    }
+    if ($dead) {
+        return false;
+    }
+    if (!extension_loaded('redis') || !class_exists('Redis')) {
+        $dead = true;
+        return false;
+    }
+    $host = '127.0.0.1';
+    $port = 6379;
+    $auth = '';
+    if (isset($zbp) && is_object($zbp)) {
+        $cfg = $zbp->Config('at8_media_library');
+        if ((string) $cfg->redis_host !== '') {
+            $host = (string) $cfg->redis_host;
+        }
+        if ((int) $cfg->redis_port > 0) {
+            $port = (int) $cfg->redis_port;
+        }
+        $auth = (string) $cfg->redis_auth;
+    }
+    try {
+        $r = new Redis();
+        $r->connect($host, $port, 0.5, null, 0, 0.5);
+        if ($auth !== '') {
+            $r->auth($auth);
+        }
+        $r->select(0);
+        $redis = $r;
+    } catch (Exception $e) {
+        $dead = true; // 连接失败本次运行不再重试，直接走下层
+        return false;
+    } catch (Throwable $e) {
+        $dead = true;
+        return false;
+    }
+    return $redis;
+}
+
+function media_library_cache_apcu()
+{
+    static $ok = null;
+    if ($ok === null) {
+        $ok = function_exists('apcu_enabled') && apcu_enabled();
+    }
+    return $ok;
+}
+
+function media_library_cache_dir()
+{
+    static $dir = null;
+    if ($dir !== null) {
+        return $dir;
+    }
+    $dir = dirname(__FILE__) . '/cache';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    if (!is_dir($dir) || !is_writable($dir)) {
+        $dir = '';
+        return $dir;
+    }
+    // 目录防护：禁止直接访问（Apache / 通用兜底）
+    $ht = $dir . '/.htaccess';
+    if (!is_file($ht)) {
+        @file_put_contents($ht, "Require all denied\nDeny from all\n");
+    }
+    $idx = $dir . '/index.html';
+    if (!is_file($idx)) {
+        @file_put_contents($idx, '');
+    }
+    return $dir;
+}
+
+function media_library_cache_get($key)
+{
+    $key = 'at8ml:' . $key;
+
+    // 1) Redis
+    $r = media_library_cache_redis();
+    if ($r) {
+        try {
+            $v = $r->get($key);
+            if ($v !== false && $v !== null) {
+                $d = json_decode((string) $v, true);
+                if (is_array($d) && array_key_exists('d', $d)) {
+                    if ($d['_e'] > 0 && $d['_e'] < time()) {
+                        return null; // 已过期（Redis TTL 兜底，理论到不了）
+                    }
+                    return $d['d'];
+                }
+            }
+        } catch (Exception $e) {
+        } catch (Throwable $e) {
+        }
+    }
+
+    // 2) APCu（TTL 原生支持，过期自动 miss）
+    if (media_library_cache_apcu()) {
+        $ok = false;
+        $v = apcu_fetch($key, $ok);
+        if ($ok && is_array($v) && array_key_exists('d', $v)) {
+            return $v['d'];
+        }
+    }
+
+    // 3) Opcache 文件缓存（opcache 开启时 include 命中共享内存；未开启则普通文件读）
+    $dir = media_library_cache_dir();
+    if ($dir !== '') {
+        $file = $dir . '/' . md5($key) . '.php';
+        if (is_file($file)) {
+            $d = @include $file;
+            if (is_array($d) && array_key_exists('d', $d)) {
+                if ($d['_e'] > 0 && $d['_e'] < time()) {
+                    @unlink($file);
+                    return null;
+                }
+                return $d['d'];
+            }
+        }
+    }
+
+    return null;
+}
+
+function media_library_cache_set($key, $data, $ttl = 0)
+{
+    $key = 'at8ml:' . $key;
+    $payload = array('_e' => ($ttl > 0 ? time() + (int) $ttl : 0), 'd' => $data);
+
+    // 1) Redis
+    $r = media_library_cache_redis();
+    if ($r) {
+        try {
+            $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+            if ($ttl > 0) {
+                $r->setex($key, (int) $ttl, $json);
+            } else {
+                $r->set($key, $json);
+            }
+        } catch (Exception $e) {
+        } catch (Throwable $e) {
+        }
+    }
+
+    // 2) APCu
+    if (media_library_cache_apcu()) {
+        @apcu_store($key, $payload, (int) $ttl);
+    }
+
+    // 3) Opcache 文件缓存（原子写入：临时文件 + rename）
+    $dir = media_library_cache_dir();
+    if ($dir !== '') {
+        $export = var_export($payload, true);
+        $export = str_replace('?>', "?\x3E", $export); // 防止提前结束 PHP 标签
+        $code = "<?php\n// at8_media_library runtime cache\nreturn " . $export . ";\n";
+        $file = $dir . '/' . md5($key) . '.php';
+        $tmp = $file . '.' . uniqid('', true) . '.tmp';
+        if (@file_put_contents($tmp, $code, LOCK_EX) !== false) {
+            @rename($tmp, $file);
+        }
+        if (is_file($tmp)) {
+            @unlink($tmp);
+        }
+    }
+}
+
+function media_library_cache_del($key)
+{
+    $key = 'at8ml:' . $key;
+
+    $r = media_library_cache_redis();
+    if ($r) {
+        try {
+            $r->del($key);
+        } catch (Exception $e) {
+        } catch (Throwable $e) {
+        }
+    }
+
+    if (media_library_cache_apcu()) {
+        @apcu_delete($key);
+    }
+
+    $dir = media_library_cache_dir();
+    if ($dir !== '') {
+        @unlink($dir . '/' . md5($key) . '.php');
+    }
+}
+
 function media_library_stats_ttl()
 {
     return 300; // 缓存 5 分钟
@@ -761,6 +966,7 @@ function media_library_stats_ttl()
 function media_library_stats_flush()
 {
     global $zbp;
+    media_library_cache_del('stats');
     if (isset($zbp->cache) && is_object($zbp->cache)) {
         $zbp->cache->media_library_stats_time = 0;
         if (method_exists($zbp, 'SaveCache')) {
@@ -773,21 +979,28 @@ function media_library_stats()
 {
     global $zbp;
 
-    // 读缓存
+    // 读缓存（优先 Redis / APCu / Opcache 文件缓存）
+    $cached = media_library_cache_get('stats');
+    if (is_array($cached) && isset($cached['total'])) {
+        return $cached;
+    }
+
+    // 兼容旧缓存：系统 cache 存储的 5 分钟缓存
     if (isset($zbp->cache) && is_object($zbp->cache)) {
         $ts = (int) $zbp->cache->media_library_stats_time;
         $raw = (string) $zbp->cache->media_library_stats;
         if ($raw !== '' && $ts > 0 && (time() - $ts) < media_library_stats_ttl()) {
-            $cached = @json_decode($raw, true); // JSON 存储，避免 unserialize 的对象注入面
-            if (is_array($cached) && isset($cached['total'])) {
-                return $cached;
+            $legacy = @json_decode($raw, true); // JSON 存储，避免 unserialize 的对象注入面
+            if (is_array($legacy) && isset($legacy['total'])) {
+                return $legacy;
             }
         }
     }
 
     $data = media_library_stats_compute();
 
-    // 写缓存（JSON 编码，兼容旧版序列化残留：解析失败自动重算）
+    // 写缓存（新缓存层 + 旧系统 cache 双写，保证任意环境下都有缓存生效）
+    media_library_cache_set('stats', $data, media_library_stats_ttl());
     if (isset($zbp->cache) && is_object($zbp->cache)) {
         $zbp->cache->media_library_stats = (string) json_encode($data);
         $zbp->cache->media_library_stats_time = time();
