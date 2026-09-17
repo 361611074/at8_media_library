@@ -153,6 +153,8 @@ if ($act == 'update') {
     }
     media_library_update_meta($u, $_POST);
     $u->Save();
+    // 关联状态变化影响「未关联文章」统计，缓存必须同步失效
+    media_library_stats_flush();
     media_library_ok(media_library_upload_row($u));
 }
 
@@ -224,6 +226,7 @@ if ($act == 'bulk') {
                 $done++;
             }
         }
+        media_library_stats_flush();
         media_library_ok(array('done' => $done));
     }
 
