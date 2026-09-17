@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.2.5');
+    define('MEDIA_LIBRARY_VERSION', '1.2.6');
 }
 
 /**
@@ -1640,20 +1640,14 @@ function media_library_edit_panel()
     $apiJs = json_encode($api, $safe[0] | $safe[1]);
     $tokenJs = json_encode($token, $safe[0] | $safe[1]);
     $cssHtml = htmlspecialchars($css);
-    $canUpload = ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root')) ? 1 : 0;
 
     echo '<link rel="stylesheet" href="' . $cssHtml . '">' . "\n";
     echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章配图</label>';
     echo '<div class="ml-panel-btns">'
         . '<button type="button" class="ml-panel-btn ml-panel-btn-primary" id="ml-edit-open">'
         . '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
-        . '<span>管理 / 插入配图</span></button>';
-    if ($canUpload) {
-        echo '<button type="button" class="ml-panel-btn" id="ml-edit-upload">'
-            . '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg>'
-            . '<span>上传图片</span></button>';
-    }
-    echo '</div></div>' . "\n";
+        . '<span>管理 / 插入配图</span></button>'
+        . '</div></div>' . "\n";
 
     // 弹窗样式独立作用域（ID 选择器 + 显式四边定位 + 高 z-index），不依赖后台环境样式
     echo '<style id="ml-edit-style">' . "\n"
@@ -1800,45 +1794,6 @@ function media_library_edit_panel()
 	$('ml-edit-open').addEventListener('click', function (e) {
 		e.preventDefault();
 		openMask();
-	});
-	var up = $('ml-edit-upload');
-	if (up) up.addEventListener('click', function (e) {
-		e.preventDefault();
-		var pid = postId();
-		if (!pid) { alert('请先保存文章，再上传配图。'); return; }
-		var inp = document.createElement('input');
-		inp.type = 'file';
-		inp.accept = 'image/*';
-		inp.multiple = true;
-		inp.onchange = function () {
-			var files = inp.files;
-			if (!files.length) return;
-			var done = 0, fail = 0, last = null;
-			for (var i = 0; i < files.length; i++) {
-				(function (f) {
-					var fd = new FormData();
-					fd.append('act', 'upload');
-					fd.append('csrfToken', TOKEN);
-					fd.append('logid', pid);
-					fd.append('files', f, f.name);
-					var x = new XMLHttpRequest();
-					x.open('POST', API, true);
-					x.onreadystatechange = function () {
-						if (x.readyState !== 4) return;
-						var d = null;
-						try { d = JSON.parse(x.responseText); } catch (err) { }
-						if (d && d.code === 0) { done++; last = d.data; } else { fail++; }
-						if (done + fail === files.length) {
-							alert('上传完成：成功 ' + done + ' 个' + (fail ? '，失败 ' + fail + ' 个' : ''));
-							if (last) insertHtml('<p><img src="' + last.url + '" alt="' + esc(last.alt || last.name) + '"></p>');
-							load();
-						}
-					};
-					x.send(fd);
-				})(files[i]);
-			}
-		};
-		inp.click();
 	});
 	$('ml-edit-close').addEventListener('click', closeMask);
 	$('ml-edit-mask').addEventListener('click', function (e) {
