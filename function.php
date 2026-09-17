@@ -1663,8 +1663,9 @@ function media_library_edit_panel()
         . '#ml-edit-panel .ml-panel-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff;box-shadow:0 2px 8px rgba(42,92,245,.30)}' . "\n"
         . '#ml-edit-panel .ml-panel-btn-primary:hover{background:#1f4ae0;color:#fff;box-shadow:0 4px 12px rgba(42,92,245,.38)}' . "\n"
         . '#ml-edit-panel .ml-panel-btn svg{flex:0 0 auto}' . "\n"
-        . '#ml-edit-mask{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;background:rgba(9,14,25,.55);z-index:99999;display:none;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}' . "\n"
+        . '#ml-edit-mask{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;background:rgba(9,14,25,.55);z-index:2147483000;display:none;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}' . "\n"
         . '#ml-edit-mask.mlx-open{display:flex}' . "\n"
+        . 'body.ml-edit-modal-open [class*="toolbarbox"]{visibility:hidden}' . "\n"
         . '#ml-edit-mask .mlx-modal{display:flex;flex-direction:column;background:#fff;border-radius:14px;width:780px;max-width:96vw;max-height:86vh;box-shadow:0 24px 70px rgba(9,14,25,.35);overflow:hidden;font-family:inherit}' . "\n"
         . '#ml-edit-mask .mlx-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;background:#f7f9fd;border-bottom:1px solid #eef1f7;font-size:15px;font-weight:700;color:#1f2d3d}' . "\n"
         . '#ml-edit-mask .mlx-modal-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' . "\n"
@@ -1785,11 +1786,16 @@ function media_library_edit_panel()
 		});
 	}
 	function openMask() {
-		$('ml-edit-mask').classList.add('mlx-open');
+		var mask = $('ml-edit-mask');
+		// 挂到 body 顶层：脱离右栏可能的层叠上下文，保证遮罩永远盖住全页
+		if (mask.parentElement !== document.body) document.body.appendChild(mask);
+		document.body.classList.add('ml-edit-modal-open');
+		mask.classList.add('mlx-open');
 		load();
 	}
 	function closeMask() {
 		$('ml-edit-mask').classList.remove('mlx-open');
+		document.body.classList.remove('ml-edit-modal-open');
 	}
 	$('ml-edit-open').addEventListener('click', function (e) {
 		e.preventDefault();
