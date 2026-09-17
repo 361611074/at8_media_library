@@ -62,7 +62,7 @@ function media_library_can_view()
 function media_library_check_login()
 {
     global $zbp;
-    if (!$zbp->CheckPlugin('media_library')) {
+    if (!$zbp->CheckPlugin('at8_media_library')) {
         media_library_error('插件未启用', 48);
     }
     if (!$zbp->CheckRights('admin')) {

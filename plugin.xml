@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <plugin version="php">
-	<id>media_library</id>
+	<id>at8_media_library</id>
 	<name>媒体库 · 相册式附件管理</name>
 	<url>https://www.at8.fun/</url>
 	<note>以相册（网格）形式管理图片与附件，支持按文章分类、文件类型、上传时间、作者等筛选，支持拖拽上传、批量操作、信息编辑与大图预览。</note>
