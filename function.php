@@ -529,10 +529,12 @@ function media_library_build_where($p)
         $where[] = $kindWhere;
     }
 
-    // 文章分类（含子分类）
-    $cateid = isset($p['cateid']) ? (int) $p['cateid'] : 0;
-    if ($cateid > 0) {
-        $ids = media_library_post_ids_by_cate($cateid);
+    // 文章分类（含子分类）；cateid=none 为「未关联附件」虚拟分类（不经文章反查，直接匹配 ul_LogID=0）
+    $cateid = isset($p['cateid']) ? trim((string) $p['cateid']) : '';
+    if ($cateid === 'none') {
+        $where[] = array('=', 'ul_LogID', 0);
+    } elseif ((int) $cateid > 0) {
+        $ids = media_library_post_ids_by_cate((int) $cateid);
         if (count($ids) == 0) {
             $where[] = array('=', 'ul_ID', 0); // 该分类下没有文章，返回空结果
         } else {

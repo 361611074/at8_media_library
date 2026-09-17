@@ -198,6 +198,10 @@
 			// 分类下拉
 			var cate = $('ml-cate');
 			cate.innerHTML = '<option value="">全部分类</option>';
+			var oNone = document.createElement('option');
+			oNone.value = 'none';
+			oNone.textContent = '未关联附件';
+			cate.appendChild(oNone);
 			(d.categories || []).forEach(function (c) {
 				var pad = c.parentid > 0 ? '　' : '';
 				var o = document.createElement('option');
