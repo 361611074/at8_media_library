@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.2.6');
+    define('MEDIA_LIBRARY_VERSION', '1.2.7');
 }
 
 /**
