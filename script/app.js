@@ -395,7 +395,7 @@
 			'<tr><td>上传者</td><td>' + esc(item.author) + '</td></tr>' +
 			'<tr><td>文件状态</td><td>' + (item.exists ? '正常' : '<span class="mlx-missing">文件缺失（记录存在但文件已被删除）</span>') + '</td></tr>' +
 			'<tr><td>关联文章</td><td>' + (item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</td></tr>' +
-			'<tr><td>引用状态</td><td id="ml-dw-quote">' + (item.logid > 0 ? '检测中…' : '—（未关联）') + '</td></tr>';
+			'<tr><td>引用状态</td><td id="ml-dw-quote">' + (item.logid > 0 ? '检测中…' : '<span style="color:#b8860b">⚠️ 未引用（未关联文章）</span>') + '</td></tr>';
 
 		dw.innerHTML =
 			'<div class="mlx-dw-head"><b title="' + esc(item.name) + '">' + esc(item.name) + '</b>' +
@@ -451,6 +451,10 @@
 				} else {
 					cell.innerHTML = '<span style="color:#b8860b">⚠️ 仅关联未引用</span>';
 				}
+			}, function () {
+				var cell = $('ml-dw-quote');
+				if (!cell) return;
+				cell.innerHTML = '<span style="color:#c0392b">检测失败，请重试</span>';
 			});
 		}
 
