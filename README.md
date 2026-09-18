@@ -52,6 +52,16 @@
 
 ## 更新日志
 
+### 1.4.0
+
+- 规范：自定义函数 / 常量前缀与应用 ID 统一——`media_library_*`（58 个函数）更名为 `at8_media_library_*`，`MEDIA_LIBRARY_VERSION` 更名为 `AT8_MEDIA_LIBRARY_VERSION`（对齐《注意事项速查表》03 条）
+- 规范：`script/app.js` 与编辑页脚本全部放弃 `var`，改用 `let` / `const`（速查表 18 条）
+- 规范：编辑页面板内联 `<style id="ml-edit-style">` 与约 150 行内嵌 `<script>` 外置为 `css/edit.css` 与 `script/edit.js`（CSRF 令牌经 `data-token` 属性注入）；JS 动态渲染的内联 `style=""` 收敛为 class（速查表 17 条）
+- 优化：`realpath_in_upload()` 前缀判断补目录分隔符，防 `/upload2` 类相邻目录误判
+- 优化：卸载插件时清理插件目录下运行时生成的 `cache/` 文件缓存
+- 优化：API 未知操作提示不再做 HTML 转义，消除前端展示的双重转义实体字符（`$act` 不参与任何 SQL / 文件操作）
+- 优化：图片尺寸 `getimagesize()` 增加请求内静态缓存（key 含文件 mtime），同一附件同请求内不重复读盘
+
 ### 1.3.2
 
 - 修复：debug 插件（开发模式）下所有 API 响应被系统错误页 HTML 污染导致媒体库不可用——JSON 输出前的缓冲清理原为「清空全部缓冲层」循环，会把 debug 插件的输出捕获层一并删除，其收尾 `ob_end_clean()` 时无缓冲可删产生 E_WARNING，被 debug 模式错误处理器渲染为整页 HTML 追加在 JSON 之后。现对齐官方 `ApiResponse()` 的 `@ob_clean()` 思路：只清空缓冲内容、不删除任何缓冲层，输出 JSON 后逐层推送给客户端（缓冲层保留且已空），debug 插件收尾不再告警、JSON 也不会被其收尾清理连带丢弃
