@@ -50,6 +50,10 @@
 
 ## 更新日志
 
+### 1.2.10
+
+- 修复：媒体库页面打开报「Undefined array key 0」——v1.2.9 改用官方 `GetPostList()` 时误用其签名（官方第一参数是 `$select` 而非 `$where`），修正为 `GetPostList(null, $where, $order, $limit)`
+
 ### 1.2.9
 
 - 重构：上传落盘改用系统官方 `Upload::SaveFile()`——由系统负责建目录与 Windows 字符集转码，并触发 `Filter_Plugin_Upload_SaveFile` 接口（云存储接管类插件经此生效），不再自写 mkdir / move_uploaded_file 流程
