@@ -26,28 +26,20 @@ if ($act == 'categories') {
     media_library_ok(media_library_categories());
 }
 
-// 文章搜索（关联下拉用）
+// 文章搜索（关联下拉用，复用官方 GetPostList）
 if ($act == 'posts') {
     $kw = trim(GetVars('q', 'GET'));
     $where = array();
     if ($kw != '') {
         $where[] = array('LIKE', 'log_Title', '%' . $kw . '%');
     }
-    $sql = $zbp->db->sql->Select(
-        $zbp->table['Post'],
-        array('log_ID', 'log_Title', 'log_Type'),
-        $where,
-        array('log_PostTime' => 'DESC'),
-        array(20)
-    );
-    $res = $zbp->db->Query($sql);
+    $list = $zbp->GetPostList($where, array('log_PostTime' => 'DESC'), array(20));
     $out = array();
-    foreach ($res as $r) {
-        $vals = array_values($r);
+    foreach ($list as $p) {
         $out[] = array(
-            'id' => (int) $vals[0],
-            'title' => (string) $vals[1],
-            'type' => (int) $vals[2],
+            'id' => (int) $p->ID,
+            'title' => $p->Title,
+            'type' => (int) $p->Type,
         );
     }
     media_library_ok($out);

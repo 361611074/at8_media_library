@@ -64,7 +64,6 @@ function InstallPlugin_at8_media_library()
         } else {
             $zbp->Config('at8_media_library')->perpage = 48;
         }
-        $zbp->Config('at8_media_library')->version = MEDIA_LIBRARY_VERSION;
         $zbp->SaveConfig('at8_media_library');
     }
 }

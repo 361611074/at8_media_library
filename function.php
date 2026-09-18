@@ -85,7 +85,7 @@ function media_library_check_upload_rights()
 }
 
 /**
- * CSRF 校验（POST 请求）
+ * CSRF 校验（POST 请求，复用官方 CheckCSRFTokenValid）
  */
 function media_library_check_csrf()
 {
@@ -93,14 +93,8 @@ function media_library_check_csrf()
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         return;
     }
-    // 优先自行校验 csrfToken，失败时返回 JSON 而非系统 HTML 错误页
-    $ok = false;
-    if (method_exists($zbp, 'VerifyCSRFToken')) {
-        $ok = $zbp->VerifyCSRFToken(GetVars('csrfToken', 'REQUEST'));
-    }
-    if (!$ok && function_exists('CheckCSRFTokenValid')) {
-        $ok = CheckCSRFTokenValid();
-    }
+    // 官方校验函数失败时返回 JSON 而非系统 HTML 错误页
+    $ok = function_exists('CheckCSRFTokenValid') && CheckCSRFTokenValid('csrfToken', array('post'));
     if ($ok && $zbp->option['ZC_ADDITIONAL_SECURITY'] && function_exists('CheckHTTPRefererValid')) {
         $ok = CheckHTTPRefererValid();
     }
@@ -512,7 +506,7 @@ function media_library_size_text($size)
 }
 
 /**
- * 获取某分类及其全部子分类 ID
+ * 取某分类及其全部子分类 ID（复用系统常驻的 $zbp->categories）
  */
 function media_library_cate_ids($cateid)
 {
@@ -520,14 +514,10 @@ function media_library_cate_ids($cateid)
     $cateid = (int) $cateid;
     $ids = array($cateid);
 
-    // 从分类表读父子关系自行向下递归（不依赖 Category 对象的内部属性，避免版本差异）
-    $table = isset($zbp->table['Category']) ? $zbp->table['Category'] : '%pre%category';
-    $sql = $zbp->db->sql->Select($table, array('cate_ID', 'cate_ParentID'), null, null, null);
-    $res = $zbp->db->Query($sql);
+    // 由系统分类对象构建父子关系向下递归
     $children = array();
-    foreach ($res as $r) {
-        $v = array_values($r);
-        $children[(int) $v[1]][] = (int) $v[0];
+    foreach ($zbp->categories as $c) {
+        $children[(int) $c->ParentID][] = (int) $c->ID;
     }
 
     $queue = array($cateid);
@@ -714,14 +704,13 @@ function media_library_category_stats($scan)
 }
 
 /**
- * 全部分类树（下拉筛选用）
+ * 全部分类树（下拉筛选用，复用系统常驻的 $zbp->categories，已按 cate_Order 排序）
  */
 function media_library_categories()
 {
     global $zbp;
-    $list = $zbp->GetCategoryList(null, null, array('cate_Order' => 'ASC'), null, null);
     $out = array();
-    foreach ($list as $c) {
+    foreach ($zbp->categories as $c) {
         $out[] = array(
             'id' => (int) $c->ID,
             'name' => $c->Name,
@@ -1501,38 +1490,33 @@ function media_library_save_one($fileInfo, $logid)
     $u = new Upload();
     $u->PostTime = time();
     $u->Name = $base . '.' . $ext;
-    $dirAbs = $zbp->usersdir . $u->Dir; // Dir 由对象按上传时间推导（含 ZC_UPLOAD_DIR_* 与云存储接管 hook）
-    if (!is_dir($dirAbs)) {
-        @mkdir($dirAbs, 0755, true);
-    }
-    if (!is_dir($dirAbs)) {
-        media_library_error('上传目录创建失败：' . $u->Dir);
-    }
 
-    // Windows 主机按系统字符集转码落盘（与系统 SaveFile 行为一致，DB 中仍存 UTF-8 名）
-    $toDiskName = function ($name) use ($zbp) {
-        if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
-            $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $name);
-            if (is_string($conv) && $conv !== '') {
-                return $conv;
-            }
-        }
-        return $name;
-    };
-
-    // 同名冲突处理
-    if (file_exists($dirAbs . $toDiskName($u->Name))) {
+    // 同名冲突处理（官方 SaveFile 不处理冲突，与系统上传一致：先改名再落盘）
+    if (is_file($u->FullFile)) {
         $u->Name = $base . '_' . date('dHis') . '_' . mt_rand(100, 999) . '.' . $ext;
     }
 
-    if (!@move_uploaded_file($fileInfo['tmp_name'], $dirAbs . $toDiskName($u->Name))) {
-        media_library_error('文件保存失败，请检查目录写入权限');
-    }
-    @chmod($dirAbs . $toDiskName($u->Name), 0644);
+    // 官方方法落盘：内置建目录、Windows 字符集转码，并触发 Filter_Plugin_Upload_SaveFile（云存储接管插件经此 hook 生效）
+    $u->SaveFile($fileInfo['tmp_name']);
 
-    $mime = media_library_detect_mime($dirAbs . $toDiskName($u->Name), $ext);
+    // SaveFile 无论成败均返回 true（系统行为），落盘结果必须实际验证。
+    // Windows 下磁盘名为本地字符集转码结果，需按同一规则换算后检查。
+    $diskName = $u->Name;
+    if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
+        $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $u->Name);
+        if (is_string($conv) && $conv !== '') {
+            $diskName = $conv;
+        }
+    }
+    $savedPath = $zbp->usersdir . $u->Dir . $diskName;
+    if (!is_file($savedPath)) {
+        media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
+    }
+    @chmod($savedPath, 0644);
+
+    $mime = media_library_detect_mime($savedPath, $ext);
     $u->SourceName = $show;
-    $u->Size = (int) @filesize($dirAbs . $toDiskName($u->Name));
+    $u->Size = (int) @filesize($savedPath);
     $u->MimeType = $mime;
     $u->AuthorID = (int) $zbp->user->ID;
     $u->LogID = max(0, (int) $logid);

@@ -14,13 +14,19 @@ if (!media_library_can_view()) {$zbp->ShowError(6);die();}
 
 $blogtitle = '媒体库 · 相册式附件管理';
 
+// 每页数量：读插件配置（InstallPlugin 写入，默认 48）
+$ml_perpage = (int) $zbp->Config('at8_media_library')->perpage;
+if ($ml_perpage <= 0) {
+    $ml_perpage = 48;
+}
+
 // 需要传递给前端的配置
 $ml_config = array(
     'api' => $zbp->host . 'zb_users/plugin/at8_media_library/api.php',
     'host' => $zbp->host,
     'csrfToken' => method_exists($zbp, 'GetCSRFToken') ? $zbp->GetCSRFToken() : (function_exists('csrfToken') ? csrfToken() : ''),
     'canUpload' => ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root')) ? 1 : 0,
-    'perpage' => 48,
+    'perpage' => $ml_perpage,
     'user' => $zbp->user->Name,
 );
 $ml_config_json = json_encode($ml_config, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
@@ -81,10 +87,10 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 				<button type="button" class="mlx-vs-btn" data-view="list" title="列表视图">☰</button>
 			</span>
 			<select class="mlx-input mlx-mini" id="ml-perpage">
-				<option value="24">24 / 页</option>
-				<option value="48" selected>48 / 页</option>
-				<option value="96">96 / 页</option>
-				<option value="200">200 / 页</option>
+				<option value="24"<?php if ($ml_perpage == 24) echo ' selected'; ?>>24 / 页</option>
+				<option value="48"<?php if ($ml_perpage == 48) echo ' selected'; ?>>48 / 页</option>
+				<option value="96"<?php if ($ml_perpage == 96) echo ' selected'; ?>>96 / 页</option>
+				<option value="200"<?php if ($ml_perpage == 200) echo ' selected'; ?>>200 / 页</option>
 			</select>
 		</div>
 
