@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.3.1');
+    define('MEDIA_LIBRARY_VERSION', '1.3.2');
 }
 
 /**
@@ -16,13 +16,24 @@ if (!defined('MEDIA_LIBRARY_VERSION')) {
  */
 function media_library_json($arr)
 {
-    while (ob_get_length() !== false && @ob_end_clean()) {
+    // 对齐官方 ApiResponse() 的 @ob_clean() 思路：只清空缓冲内容、不删除任何缓冲层，
+    // 保留 debug 插件等基于输出捕获的工具层；输出 JSON 后将内容逐层推送给客户端，
+    // 收尾时缓冲层仍在但已空——debug 插件收尾 ob_end_clean() 有缓冲可删不会报 E_WARNING，
+    // JSON 也已送达客户端，不会被其收尾清理连带丢弃
+    if (ob_get_level() > 0) {
+        @ob_clean();
     }
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
         header('X-Content-Type-Options: nosniff');
     }
     echo json_encode($arr, JSON_UNESCAPED_UNICODE);
+    // ob_flush 不减少缓冲层数，按层数逐层把内容推送给客户端（缓冲层保留、内容清空）
+    $n = ob_get_level();
+    for (; $n > 0; $n--) {
+        @ob_flush();
+    }
+    flush();
     die();
 }
 
