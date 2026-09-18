@@ -30,6 +30,13 @@ if ($act == 'categories') {
 if ($act == 'posts') {
     $kw = trim(GetVars('q', 'GET'));
     $where = array();
+    // 非 root 仅可见「已发布 + 自己的」文章/页面，防止他人草稿、审核、私人文章标题被枚举
+    if (!$zbp->CheckRights('root')) {
+        $where[] = array('OR',
+            array('=', 'log_Status', ZC_POST_STATUS_PUBLIC),
+            array('=', 'log_AuthorID', (int) $zbp->user->ID),
+        );
+    }
     if ($kw != '') {
         $where[] = array('LIKE', 'log_Title', '%' . $kw . '%');
     }
@@ -70,6 +77,9 @@ if ($act == 'upload') {
             media_library_error('文件超过服务器上限 ' . media_library_size_text($max) . '，请调大 php.ini 的 post_max_size 与 upload_max_filesize');
         }
         media_library_error('没有收到文件');
+    }
+    if (count($files) > 30) {
+        media_library_error('单次最多上传 30 个文件，请分批处理');
     }
     $rows = array();
     foreach ($files as $f) {
@@ -229,6 +239,7 @@ if ($act == 'bulk') {
             }
         }
         media_library_stats_flush();
+        media_library_audit('批量关联 ' . $done . ' 个附件 -> 文章 #' . $logid);
         media_library_ok(array('done' => $done));
     }
 

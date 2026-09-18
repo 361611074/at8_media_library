@@ -1317,6 +1317,7 @@ function media_library_allow_exts()
         'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'py', 'sh', 'bash',
         'exe', 'dll', 'com', 'bat', 'cmd', 'msi', 'vbs', 'ps1',
         'html', 'htm', 'shtml', 'xhtml', 'js', 'mjs', 'htaccess',
+        'ini', 'env',
     );
 
     // 硬排除的可内嵌脚本格式：无论站点是否允许都不经本插件上传（防同源 XSS），
@@ -1769,10 +1770,11 @@ function media_library_edit_panel()
 			btns[k].addEventListener('click', function () {
 				var url = this.getAttribute('data-url');
 				var alt = this.getAttribute('data-alt');
+				// 二次转义：getAttribute 返回解码后的原始值，历史附件文件名可能含引号等字符，插入前必须重新转义
 				if (this.getAttribute('data-mode') === 'img') {
-					insertHtml('<p><img src="' + url + '" alt="' + alt + '"></p>');
+					insertHtml('<p><img src="' + esc(url) + '" alt="' + esc(alt) + '"></p>');
 				} else {
-					insertHtml('<p><a href="' + url + '" target="_blank">' + alt + '</a></p>');
+					insertHtml('<p><a href="' + esc(url) + '" target="_blank">' + esc(alt) + '</a></p>');
 				}
 			});
 		}
