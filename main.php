@@ -10,7 +10,7 @@ $zbp->Load();
 
 if (!$zbp->CheckPlugin('at8_media_library')) {$zbp->ShowError(48);die();}
 if (!$zbp->CheckRights('admin')) {$zbp->ShowError(6);die();}
-if (!media_library_can_view()) {$zbp->ShowError(6);die();}
+if (!at8_media_library_can_view()) {$zbp->ShowError(6);die();}
 
 $blogtitle = '媒体库 · 相册式附件管理';
 
@@ -34,7 +34,7 @@ $ml_config_json = json_encode($ml_config, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG 
 require $blogpath . 'zb_system/admin/admin_header.php';
 require $blogpath . 'zb_system/admin/admin_top.php';
 ?>
-<link rel="stylesheet" href="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/css/style.css?v=<?php echo MEDIA_LIBRARY_VERSION; ?>">
+<link rel="stylesheet" href="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/css/style.css?v=<?php echo AT8_MEDIA_LIBRARY_VERSION; ?>">
 <div id="divMain" class="mlx-root">
 	<div class="mlx-wrap">
 		<div class="mlx-header">
@@ -150,7 +150,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 </div>
 
 <script>window.ML = <?php echo $ml_config_json; ?>;</script>
-<script src="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/script/app.js?v=<?php echo MEDIA_LIBRARY_VERSION; ?>"></script>
+<script src="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/script/app.js?v=<?php echo AT8_MEDIA_LIBRARY_VERSION; ?>"></script>
 <script>if (typeof ActiveLeftMenu == "function") { ActiveLeftMenu("nav_media_library"); }</script>
 <?php
 require $blogpath . 'zb_system/admin/admin_footer.php';

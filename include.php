@@ -10,37 +10,37 @@ RegisterPlugin("at8_media_library", "ActivePlugin_at8_media_library");
 function ActivePlugin_at8_media_library()
 {
     // 后台左侧菜单
-    Add_Filter_Plugin('Filter_Plugin_Admin_LeftMenu', 'media_library_AddLeftMenu');
+    Add_Filter_Plugin('Filter_Plugin_Admin_LeftMenu', 'at8_media_library_AddLeftMenu');
     // 后台顶部菜单
-    Add_Filter_Plugin('Filter_Plugin_Admin_TopMenu', 'media_library_AddTopMenu');
+    Add_Filter_Plugin('Filter_Plugin_Admin_TopMenu', 'at8_media_library_AddTopMenu');
     // 系统自带「附件管理」页面右上角加入口
-    Add_Filter_Plugin('Filter_Plugin_Admin_UploadMng_SubMenu', 'media_library_UploadMngSubMenu');
+    Add_Filter_Plugin('Filter_Plugin_Admin_UploadMng_SubMenu', 'at8_media_library_UploadMngSubMenu');
     // 文章/页面编辑页右栏「文章配图」面板
-    Add_Filter_Plugin('Filter_Plugin_Edit_Response3', 'media_library_edit_panel');
+    Add_Filter_Plugin('Filter_Plugin_Edit_Response3', 'at8_media_library_edit_panel');
 }
 
-function media_library_AddLeftMenu(&$m)
+function at8_media_library_AddLeftMenu(&$m)
 {
     global $zbp;
-    if (!media_library_can_view()) {
+    if (!at8_media_library_can_view()) {
         return; // 无查看附件权限的账号不显示入口
     }
     $m[] = MakeLeftMenu("root", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "nav_at8_media_library", "aMediaLibrary", "");
 }
 
-function media_library_AddTopMenu(&$m)
+function at8_media_library_AddTopMenu(&$m)
 {
     global $zbp;
-    if (!media_library_can_view()) {
+    if (!at8_media_library_can_view()) {
         return;
     }
     $m[] = MakeTopMenu("root", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "_self", "topmenu_at8_media_library");
 }
 
-function media_library_UploadMngSubMenu(&$m = null)
+function at8_media_library_UploadMngSubMenu(&$m = null)
 {
     global $zbp;
-    if (!media_library_can_view()) {
+    if (!at8_media_library_can_view()) {
         return;
     }
     // 兼容两种调用约定：传入数组则追加；无参调用（老版本）则直接输出
@@ -70,5 +70,17 @@ function InstallPlugin_at8_media_library()
 
 function UninstallPlugin_at8_media_library()
 {
-    // 保留配置与附件数据，卸载不删文件
+    // 清理运行时文件缓存目录（插件目录下 cache/），保留配置与附件数据，卸载不删附件文件
+    $dir = dirname(__FILE__) . '/cache';
+    if (is_dir($dir)) {
+        $files = glob($dir . '/*');
+        if (is_array($files)) {
+            foreach ($files as $f) {
+                if (is_file($f)) {
+                    @unlink($f);
+                }
+            }
+        }
+        @rmdir($dir);
+    }
 }

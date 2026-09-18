@@ -7,14 +7,14 @@ if (!defined('ZBP_PATH')) {
     exit();
 }
 
-if (!defined('MEDIA_LIBRARY_VERSION')) {
-    define('MEDIA_LIBRARY_VERSION', '1.3.2');
+if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.0');
 }
 
 /**
  * 输出 JSON 并结束
  */
-function media_library_json($arr)
+function at8_media_library_json($arr)
 {
     // 对齐官方 ApiResponse() 的 @ob_clean() 思路：只清空缓冲内容、不删除任何缓冲层，
     // 保留 debug 插件等基于输出捕获的工具层；输出 JSON 后将内容逐层推送给客户端，
@@ -37,25 +37,25 @@ function media_library_json($arr)
     die();
 }
 
-function media_library_error($msg, $code = 1)
+function at8_media_library_error($msg, $code = 1)
 {
-    media_library_json(array('code' => $code, 'msg' => $msg));
+    at8_media_library_json(array('code' => $code, 'msg' => $msg));
 }
 
-function media_library_ok($data = null)
+function at8_media_library_ok($data = null)
 {
     $arr = array('code' => 0, 'msg' => 'ok');
     if ($data !== null) {
         $arr['data'] = $data;
     }
-    media_library_json($arr);
+    at8_media_library_json($arr);
 }
 
 /**
  * 是否有查看媒体库的权限
  * 与系统自带「附件管理」保持同一门槛（UploadMng），老版本无该权限项时退回后台登录校验
  */
-function media_library_can_view()
+function at8_media_library_can_view()
 {
     global $zbp;
     if (!$zbp->CheckRights('admin')) {
@@ -70,35 +70,35 @@ function media_library_can_view()
 /**
  * 后台登录校验 + 附件查看权限
  */
-function media_library_check_login()
+function at8_media_library_check_login()
 {
     global $zbp;
     if (!$zbp->CheckPlugin('at8_media_library')) {
-        media_library_error('插件未启用', 48);
+        at8_media_library_error('插件未启用', 48);
     }
     if (!$zbp->CheckRights('admin')) {
-        media_library_error('请先登录后台', 401);
+        at8_media_library_error('请先登录后台', 401);
     }
-    if (!media_library_can_view()) {
-        media_library_error('没有查看附件的权限', 403);
+    if (!at8_media_library_can_view()) {
+        at8_media_library_error('没有查看附件的权限', 403);
     }
 }
 
 /**
  * 附件写操作权限
  */
-function media_library_check_upload_rights()
+function at8_media_library_check_upload_rights()
 {
     global $zbp;
     if (!$zbp->CheckRights('UploadAll') && !$zbp->CheckRights('root')) {
-        media_library_error('没有操作附件的权限', 403);
+        at8_media_library_error('没有操作附件的权限', 403);
     }
 }
 
 /**
  * CSRF 校验（POST 请求，复用官方 CheckCSRFTokenValid）
  */
-function media_library_check_csrf()
+function at8_media_library_check_csrf()
 {
     global $zbp;
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -110,14 +110,14 @@ function media_library_check_csrf()
         $ok = CheckHTTPRefererValid();
     }
     if (!$ok) {
-        media_library_error('安全校验失败，请刷新页面后重试', 403);
+        at8_media_library_error('安全校验失败，请刷新页面后重试', 403);
     }
 }
 
 /**
  * 按扩展名 / MIME 判断文件类别
  */
-function media_library_kind($mime, $name)
+function at8_media_library_kind($mime, $name)
 {
     $ext = strtolower(substr($name, strrpos($name, '.') + 1));
     $mime = strtolower((string) $mime);
@@ -158,7 +158,7 @@ function media_library_kind($mime, $name)
     return 'other';
 }
 
-function media_library_kind_label($kind)
+function at8_media_library_kind_label($kind)
 {
     $map = array(
         'image' => '图片',
@@ -174,7 +174,7 @@ function media_library_kind_label($kind)
 /**
  * 按类别生成查询条件（使用系统 SQL 构造器的 where 数组）
  */
-function media_library_kind_where($kind)
+function at8_media_library_kind_where($kind)
 {
     $img = array('OR',
         array('LIKE', 'ul_MimeType', 'image%'),
@@ -258,10 +258,10 @@ function media_library_kind_where($kind)
 /**
  * 取某分类（含子分类）下的文章 ID
  */
-function media_library_post_ids_by_cate($cateid)
+function at8_media_library_post_ids_by_cate($cateid)
 {
     global $zbp;
-    $cateIds = media_library_cate_ids($cateid);
+    $cateIds = at8_media_library_cate_ids($cateid);
     $ids = array();
     foreach (array_chunk($cateIds, 200) as $chunk) {
         $sql = $zbp->db->sql->Select(
@@ -283,7 +283,7 @@ function media_library_post_ids_by_cate($cateid)
 /**
  * 分类 ID => 名称 映射（单次查询，请求内缓存）
  */
-function media_library_cate_name_map()
+function at8_media_library_cate_name_map()
 {
     global $zbp;
     static $map = null;
@@ -304,9 +304,9 @@ function media_library_cate_name_map()
 /**
  * 取单个分类名称
  */
-function media_library_cate_name($cid)
+function at8_media_library_cate_name($cid)
 {
-    $map = media_library_cate_name_map();
+    $map = at8_media_library_cate_name_map();
     $cid = (int) $cid;
     return isset($map[$cid]) ? $map[$cid] : '';
 }
@@ -314,7 +314,7 @@ function media_library_cate_name($cid)
 /**
  * 批量取文章 ID => 分类 ID 映射
  */
-function media_library_post_cate_map($logIds)
+function at8_media_library_post_cate_map($logIds)
 {
     global $zbp;
     $logIds = array_values(array_unique(array_filter(array_map('intval', $logIds))));
@@ -342,7 +342,7 @@ function media_library_post_cate_map($logIds)
 /**
  * 批量取文章 ID => 标题 / 分类 映射
  */
-function media_library_post_info_map($logIds)
+function at8_media_library_post_info_map($logIds)
 {
     global $zbp;
     $logIds = array_values(array_unique(array_filter(array_map('intval', $logIds))));
@@ -370,7 +370,7 @@ function media_library_post_info_map($logIds)
 /**
  * 批量取用户 ID => 用户名 映射
  */
-function media_library_member_name_map($uids)
+function at8_media_library_member_name_map($uids)
 {
     global $zbp;
     $uids = array_values(array_unique(array_filter(array_map('intval', $uids))));
@@ -398,7 +398,7 @@ function media_library_member_name_map($uids)
 /**
  * 格式化附件记录（单条）
  */
-function media_library_upload_row($u)
+function at8_media_library_upload_row($u)
 {
     global $zbp;
 
@@ -406,12 +406,12 @@ function media_library_upload_row($u)
     $row['id'] = (int) $u->ID;
     $row['name'] = $u->SourceName;                    // 原始文件名
     $row['path'] = $u->Name;                          // 相对路径（原始存储值）
-    $row['url'] = media_library_upload_url($u);       // 完整 URL
+    $row['url'] = at8_media_library_upload_url($u);       // 完整 URL
     $row['size'] = (int) $u->Size;
-    $row['size_text'] = media_library_size_text((int) $u->Size);
+    $row['size_text'] = at8_media_library_size_text((int) $u->Size);
     $row['mime'] = $u->MimeType;
-    $row['kind'] = media_library_kind($u->MimeType, $u->Name);
-    $row['kind_label'] = media_library_kind_label($row['kind']);
+    $row['kind'] = at8_media_library_kind($u->MimeType, $u->Name);
+    $row['kind_label'] = at8_media_library_kind_label($row['kind']);
     $row['time'] = (int) $u->PostTime;
     $row['date_text'] = date('Y-m-d H:i', (int) $u->PostTime);
     $row['month'] = date('Y-m', (int) $u->PostTime);
@@ -434,18 +434,21 @@ function media_library_upload_row($u)
     }
 
     // 文件是否真实存在（路径由 Upload 对象推导，兼容系统上传的存储格式）
-    $file = media_library_disk_path($u);
+    $file = at8_media_library_disk_path($u);
     $row['exists'] = ($file !== '') ? 1 : 0;
 
-    // 图片尺寸
+    // 图片尺寸（请求内静态缓存，key 含 mtime 防替换后读到旧尺寸；避免同请求内重复读盘）
     $row['width'] = 0;
     $row['height'] = 0;
     if ($row['kind'] == 'image' && $row['exists']) {
-        $info = @getimagesize($file);
-        if (is_array($info)) {
-            $row['width'] = (int) $info[0];
-            $row['height'] = (int) $info[1];
+        static $dimCache = array();
+        $ck = $file . '|' . (string) @filemtime($file);
+        if (!isset($dimCache[$ck])) {
+            $info = @getimagesize($file);
+            $dimCache[$ck] = is_array($info) ? array((int) $info[0], (int) $info[1]) : array(0, 0);
         }
+        $row['width'] = $dimCache[$ck][0];
+        $row['height'] = $dimCache[$ck][1];
     }
 
     // 关联文章与分类（由查询附带，未附带时按需补齐）
@@ -458,7 +461,7 @@ function media_library_upload_row($u)
         if ($post->ID > 0) {
             $row['post_title'] = $post->Title;
             $row['cateid'] = (int) $post->CateID;
-            $row['cate_name'] = media_library_cate_name($row['cateid']);
+            $row['cate_name'] = at8_media_library_cate_name($row['cateid']);
         }
     } else {
         $row['post_title'] = '';
@@ -473,7 +476,7 @@ function media_library_upload_row($u)
  * 引用匹配：判断文章正文内容中是否出现了该附件的文件名
  * 同时匹配原始文件名与 rawurlencode 后的形式（兼容中文文件名的正文 URL）
  */
-function media_library_quote_match($name, $content)
+function at8_media_library_quote_match($name, $content)
 {
     $base = basename(str_replace('\\', '/', (string) $name));
     $content = (string) $content;
@@ -491,7 +494,7 @@ function media_library_quote_match($name, $content)
  * 引用检测：关联文章的正文中是否实际引用了该附件
  * 返回 null 表示未关联（无需检测）；state: quoted=已引用 linked=仅关联未引用 missing=关联文章不存在
  */
-function media_library_quote_state($u)
+function at8_media_library_quote_state($u)
 {
     global $zbp;
     if ((int) $u->LogID <= 0) {
@@ -501,11 +504,11 @@ function media_library_quote_state($u)
     if ($post->ID == 0 || (int) $post->ID !== (int) $u->LogID) {
         return array('checked' => 1, 'quoted' => 0, 'state' => 'missing');
     }
-    $quoted = media_library_quote_match($u->Name, (string) $post->Content);
+    $quoted = at8_media_library_quote_match($u->Name, (string) $post->Content);
     return array('checked' => 1, 'quoted' => $quoted ? 1 : 0, 'state' => $quoted ? 'quoted' : 'linked');
 }
 
-function media_library_size_text($size)
+function at8_media_library_size_text($size)
 {
     if ($size >= 1048576) {
         return round($size / 1048576, 2) . ' MB';
@@ -519,7 +522,7 @@ function media_library_size_text($size)
 /**
  * 取某分类及其全部子分类 ID（复用系统常驻的 $zbp->categories）
  */
-function media_library_cate_ids($cateid)
+function at8_media_library_cate_ids($cateid)
 {
     global $zbp;
     $cateid = (int) $cateid;
@@ -550,7 +553,7 @@ function media_library_cate_ids($cateid)
 /**
  * 构造列表查询的 WHERE 片段
  */
-function media_library_build_where($p)
+function at8_media_library_build_where($p)
 {
     $where = array();
 
@@ -562,7 +565,7 @@ function media_library_build_where($p)
 
     // 类别
     $kind = isset($p['kind']) ? $p['kind'] : '';
-    $kindWhere = media_library_kind_where($kind);
+    $kindWhere = at8_media_library_kind_where($kind);
     if (count($kindWhere) > 0) {
         $where[] = $kindWhere;
     }
@@ -572,7 +575,7 @@ function media_library_build_where($p)
     if ($cateid === 'none') {
         $where[] = array('=', 'ul_LogID', 0);
     } elseif ((int) $cateid > 0) {
-        $ids = media_library_post_ids_by_cate((int) $cateid);
+        $ids = at8_media_library_post_ids_by_cate((int) $cateid);
         if (count($ids) == 0) {
             $where[] = array('=', 'ul_ID', 0); // 该分类下没有文章，返回空结果
         } else {
@@ -627,7 +630,7 @@ function media_library_build_where($p)
 /**
  * 扫描附件表做统计（只读取必要列，PHP 侧聚合）
  */
-function media_library_scan()
+function at8_media_library_scan()
 {
     global $zbp;
     $sql = $zbp->db->sql->Select(
@@ -660,7 +663,7 @@ function media_library_scan()
 
         $data['total']++;
         $data['total_size'] += $size;
-        if (media_library_kind($mime, $name) == 'image') {
+        if (at8_media_library_kind($mime, $name) == 'image') {
             $data['images']++;
         }
         if ($logId <= 0) {
@@ -685,10 +688,10 @@ function media_library_scan()
 /**
  * 分类列表（含附件计数）
  */
-function media_library_category_stats($scan)
+function at8_media_library_category_stats($scan)
 {
     global $zbp;
-    $cateMap = media_library_post_cate_map(array_keys($scan['log_counts']));
+    $cateMap = at8_media_library_post_cate_map(array_keys($scan['log_counts']));
     $counts = array();
     foreach ($scan['log_counts'] as $logId => $cnt) {
         $cid = isset($cateMap[$logId]) ? (int) $cateMap[$logId] : 0;
@@ -701,7 +704,7 @@ function media_library_category_stats($scan)
 
     $out = array();
     foreach ($counts as $cid => $cnt) {
-        $name = media_library_cate_name($cid);
+        $name = at8_media_library_cate_name($cid);
         if ($name === '') {
             continue;
         }
@@ -717,7 +720,7 @@ function media_library_category_stats($scan)
 /**
  * 全部分类树（下拉筛选用，复用系统常驻的 $zbp->categories，已按 cate_Order 排序）
  */
-function media_library_categories()
+function at8_media_library_categories()
 {
     global $zbp;
     $out = array();
@@ -734,13 +737,13 @@ function media_library_categories()
 /**
  * 全部有附件的作者
  */
-function media_library_authors($scan)
+function at8_media_library_authors($scan)
 {
     $out = array();
     if (count($scan['author_counts']) == 0) {
         return $out;
     }
-    $names = media_library_member_name_map(array_keys($scan['author_counts']));
+    $names = at8_media_library_member_name_map(array_keys($scan['author_counts']));
     foreach ($scan['author_counts'] as $aid => $cnt) {
         $out[] = array(
             'id' => (int) $aid,
@@ -752,7 +755,7 @@ function media_library_authors($scan)
 }
 
 /**
- * 汇总数据缓存（写入/替换/删除/关联操作后由 media_library_stats_flush() 失效）
+ * 汇总数据缓存（写入/替换/删除/关联操作后由 at8_media_library_stats_flush() 失效）
  */
 
 /**
@@ -763,7 +766,7 @@ function media_library_authors($scan)
  *   3. Opcache 文件缓存（PHP 数组文件 + include，opcache 开启时读取走共享内存）
  * 任一层不可用自动降级，不影响功能；值一律 JSON/PHP 数组存储，不使用 unserialize。
  */
-function media_library_cache_redis()
+function at8_media_library_cache_redis()
 {
     global $zbp;
     static $redis = null, $dead = false;
@@ -808,7 +811,7 @@ function media_library_cache_redis()
     return $redis;
 }
 
-function media_library_cache_apcu()
+function at8_media_library_cache_apcu()
 {
     static $ok = null;
     if ($ok === null) {
@@ -817,7 +820,7 @@ function media_library_cache_apcu()
     return $ok;
 }
 
-function media_library_cache_dir()
+function at8_media_library_cache_dir()
 {
     static $dir = null;
     if ($dir !== null) {
@@ -843,12 +846,12 @@ function media_library_cache_dir()
     return $dir;
 }
 
-function media_library_cache_get($key)
+function at8_media_library_cache_get($key)
 {
     $key = 'at8ml:' . $key;
 
     // 1) Redis
-    $r = media_library_cache_redis();
+    $r = at8_media_library_cache_redis();
     if ($r) {
         try {
             $v = $r->get($key);
@@ -867,7 +870,7 @@ function media_library_cache_get($key)
     }
 
     // 2) APCu（TTL 原生支持，过期自动 miss）
-    if (media_library_cache_apcu()) {
+    if (at8_media_library_cache_apcu()) {
         $ok = false;
         $v = apcu_fetch($key, $ok);
         if ($ok && is_array($v) && array_key_exists('d', $v)) {
@@ -876,7 +879,7 @@ function media_library_cache_get($key)
     }
 
     // 3) Opcache 文件缓存（opcache 开启时 include 命中共享内存；未开启则普通文件读）
-    $dir = media_library_cache_dir();
+    $dir = at8_media_library_cache_dir();
     if ($dir !== '') {
         $file = $dir . '/' . md5($key) . '.php';
         if (is_file($file)) {
@@ -894,13 +897,13 @@ function media_library_cache_get($key)
     return null;
 }
 
-function media_library_cache_set($key, $data, $ttl = 0)
+function at8_media_library_cache_set($key, $data, $ttl = 0)
 {
     $key = 'at8ml:' . $key;
     $payload = array('_e' => ($ttl > 0 ? time() + (int) $ttl : 0), 'd' => $data);
 
     // 1) Redis
-    $r = media_library_cache_redis();
+    $r = at8_media_library_cache_redis();
     if ($r) {
         try {
             $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
@@ -915,12 +918,12 @@ function media_library_cache_set($key, $data, $ttl = 0)
     }
 
     // 2) APCu
-    if (media_library_cache_apcu()) {
+    if (at8_media_library_cache_apcu()) {
         @apcu_store($key, $payload, (int) $ttl);
     }
 
     // 3) Opcache 文件缓存（原子写入：临时文件 + rename）
-    $dir = media_library_cache_dir();
+    $dir = at8_media_library_cache_dir();
     if ($dir !== '') {
         $export = var_export($payload, true);
         $export = str_replace('?>', "?\x3E", $export); // 防止提前结束 PHP 标签
@@ -936,11 +939,11 @@ function media_library_cache_set($key, $data, $ttl = 0)
     }
 }
 
-function media_library_cache_del($key)
+function at8_media_library_cache_del($key)
 {
     $key = 'at8ml:' . $key;
 
-    $r = media_library_cache_redis();
+    $r = at8_media_library_cache_redis();
     if ($r) {
         try {
             $r->del($key);
@@ -949,48 +952,48 @@ function media_library_cache_del($key)
         }
     }
 
-    if (media_library_cache_apcu()) {
+    if (at8_media_library_cache_apcu()) {
         @apcu_delete($key);
     }
 
-    $dir = media_library_cache_dir();
+    $dir = at8_media_library_cache_dir();
     if ($dir !== '') {
         @unlink($dir . '/' . md5($key) . '.php');
     }
 }
 
-function media_library_stats_ttl()
+function at8_media_library_stats_ttl()
 {
     return 300; // 缓存 5 分钟
 }
 
-function media_library_stats_flush()
+function at8_media_library_stats_flush()
 {
     global $zbp;
-    media_library_cache_del('stats');
+    at8_media_library_cache_del('stats');
     if (isset($zbp->cache) && is_object($zbp->cache)) {
-        $zbp->cache->media_library_stats_time = 0;
+        $zbp->cache->at8_media_library_stats_time = 0;
         if (method_exists($zbp, 'SaveCache')) {
             $zbp->SaveCache();
         }
     }
 }
 
-function media_library_stats()
+function at8_media_library_stats()
 {
     global $zbp;
 
     // 读缓存（优先 Redis / APCu / Opcache 文件缓存）
-    $cached = media_library_cache_get('stats');
+    $cached = at8_media_library_cache_get('stats');
     if (is_array($cached) && isset($cached['total'])) {
         return $cached;
     }
 
     // 兼容旧缓存：系统 cache 存储的 5 分钟缓存
     if (isset($zbp->cache) && is_object($zbp->cache)) {
-        $ts = (int) $zbp->cache->media_library_stats_time;
-        $raw = (string) $zbp->cache->media_library_stats;
-        if ($raw !== '' && $ts > 0 && (time() - $ts) < media_library_stats_ttl()) {
+        $ts = (int) $zbp->cache->at8_media_library_stats_time;
+        $raw = (string) $zbp->cache->at8_media_library_stats;
+        if ($raw !== '' && $ts > 0 && (time() - $ts) < at8_media_library_stats_ttl()) {
             $legacy = @json_decode($raw, true); // JSON 存储，避免 unserialize 的对象注入面
             if (is_array($legacy) && isset($legacy['total'])) {
                 return $legacy;
@@ -998,13 +1001,13 @@ function media_library_stats()
         }
     }
 
-    $data = media_library_stats_compute();
+    $data = at8_media_library_stats_compute();
 
     // 写缓存（新缓存层 + 旧系统 cache 双写，保证任意环境下都有缓存生效）
-    media_library_cache_set('stats', $data, media_library_stats_ttl());
+    at8_media_library_cache_set('stats', $data, at8_media_library_stats_ttl());
     if (isset($zbp->cache) && is_object($zbp->cache)) {
-        $zbp->cache->media_library_stats = (string) json_encode($data);
-        $zbp->cache->media_library_stats_time = time();
+        $zbp->cache->at8_media_library_stats = (string) json_encode($data);
+        $zbp->cache->at8_media_library_stats_time = time();
         if (method_exists($zbp, 'SaveCache')) {
             $zbp->SaveCache();
         }
@@ -1013,7 +1016,7 @@ function media_library_stats()
     return $data;
 }
 
-function media_library_stats_compute()
+function at8_media_library_stats_compute()
 {
     global $zbp;
     $t = $zbp->table['Upload'];
@@ -1033,7 +1036,7 @@ function media_library_stats_compute()
         $vals = count($res) > 0 ? array_values($res[0]) : array(0);
         $totalsize = (int) $vals[0];
 
-        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), media_library_kind_where('image'));
+        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), at8_media_library_kind_where('image'));
         $res = $zbp->db->Query($sql);
         $vals = count($res) > 0 ? array_values($res[0]) : array(0);
         $images = (int) $vals[0];
@@ -1047,16 +1050,16 @@ function media_library_stats_compute()
             'total' => $total,
             'images' => $images,
             'total_size' => $totalsize,
-            'total_size_text' => media_library_size_text($totalsize),
+            'total_size_text' => at8_media_library_size_text($totalsize),
             'unused' => $unused,
             'months' => array(),
             'category_stats' => array(),
             'authors' => array(),
-            'categories' => media_library_categories(),
+            'categories' => at8_media_library_categories(),
         );
     }
 
-    $scan = media_library_scan();
+    $scan = at8_media_library_scan();
 
     $monthList = array();
     $i = 0;
@@ -1074,19 +1077,19 @@ function media_library_stats_compute()
         'total' => $scan['total'],
         'images' => $scan['images'],
         'total_size' => $scan['total_size'],
-        'total_size_text' => media_library_size_text($scan['total_size']),
+        'total_size_text' => at8_media_library_size_text($scan['total_size']),
         'unused' => $scan['unused'],
         'months' => $monthList,
-        'category_stats' => $heavy ? array() : media_library_category_stats($scan),
-        'authors' => $heavy ? array() : media_library_authors($scan),
-        'categories' => media_library_categories(),
+        'category_stats' => $heavy ? array() : at8_media_library_category_stats($scan),
+        'authors' => $heavy ? array() : at8_media_library_authors($scan),
+        'categories' => at8_media_library_categories(),
     );
 }
 
 /**
  * 附件列表
  */
-function media_library_list($p)
+function at8_media_library_list($p)
 {
     global $zbp;
 
@@ -1104,7 +1107,7 @@ function media_library_list($p)
     );
     $order = isset($orderMap[$orderby]) ? $orderMap[$orderby] : array('ul_PostTime' => 'DESC');
 
-    $where = media_library_build_where($p);
+    $where = at8_media_library_build_where($p);
 
     // 总数
     $sql = $zbp->db->sql->Count($zbp->table['Upload'], array('COUNT', '*'), $where);
@@ -1132,7 +1135,7 @@ function media_library_list($p)
     }
 
     // 批量补齐关联文章与分类信息（避免逐条查询）
-    $postMap = media_library_post_info_map($logIds);
+    $postMap = at8_media_library_post_info_map($logIds);
     $rows = array();
     foreach ($uploads as $u) {
         $lid = (int) $u->LogID;
@@ -1140,9 +1143,9 @@ function media_library_list($p)
             $u->ml_post_title = $postMap[$lid]['title'];
             $u->ml_cate_id = $postMap[$lid]['cateid'];
             $cid = (int) $postMap[$lid]['cateid'];
-            $u->ml_cate_name = media_library_cate_name($cid);
+            $u->ml_cate_name = at8_media_library_cate_name($cid);
         }
-        $rows[] = media_library_upload_row($u);
+        $rows[] = at8_media_library_upload_row($u);
     }
 
     // 按文章过滤时附带引用检测结果（正文是否实际引用该附件；正文只取一次，逐行匹配文件名）
@@ -1151,7 +1154,7 @@ function media_library_list($p)
         $post = $zbp->GetPostByID($logidFilter);
         $content = ($post->ID > 0 && (int) $post->ID === $logidFilter) ? (string) $post->Content : '';
         foreach ($rows as $k => $row) {
-            $rows[$k]['quoted'] = media_library_quote_match($row['path'], $content) ? 1 : 0;
+            $rows[$k]['quoted'] = at8_media_library_quote_match($row['path'], $content) ? 1 : 0;
         }
     }
 
@@ -1169,7 +1172,7 @@ function media_library_list($p)
  * 只保留中文、字母、数字、点、下划线、连字符，其余一律替换为下划线。
  * 这样文件名不含 %、空格、引号、括号等，保证「磁盘名 == URL 路径」，避免链接 404 与特殊字符引发的问题。
  */
-function media_library_safe_filename($name)
+function at8_media_library_safe_filename($name)
 {
     $name = str_replace("\0", '', (string) $name);
     $name = basename($name);
@@ -1204,7 +1207,7 @@ function media_library_safe_filename($name)
 /**
  * 生成用于展示的原始文件名（仅去控制字符，保留用户可读的原始名称）
  */
-function media_library_display_name($name)
+function at8_media_library_display_name($name)
 {
     $name = str_replace(array("\0", "\r", "\n", "\t"), ' ', (string) $name);
     $name = basename($name);
@@ -1221,23 +1224,26 @@ function media_library_display_name($name)
 /**
  * 校验并返回落在附件目录（zb_users/upload/）内的真实路径，越界返回 ''
  */
-function media_library_realpath_in_upload($path, $uploadRoot)
+function at8_media_library_realpath_in_upload($path, $uploadRoot)
 {
     $real = @realpath($path);
     if ($real === false || $real === '' || $uploadRoot === false || $uploadRoot === '') {
         return '';
     }
-    if (strpos($real, $uploadRoot) !== 0 || !@is_file($real)) {
+    // 前缀判断补目录分隔符，防 /upload2 之类相邻目录被误判为在 /upload 内
+    $real .= DIRECTORY_SEPARATOR;
+    $uploadRoot .= DIRECTORY_SEPARATOR;
+    if (strpos($real, $uploadRoot) !== 0 || !@is_file(rtrim($real, DIRECTORY_SEPARATOR))) {
         return '';
     }
-    return $real;
+    return rtrim($real, DIRECTORY_SEPARATOR);
 }
 
 /**
  * 判断是否为系统标准 ul_Name 存储格式（仅文件名，无路径前缀）
  * 标准记录的 FullFile/Url/DelFile 均可直接使用系统属性
  */
-function media_library_is_standard_name($name)
+function at8_media_library_is_standard_name($name)
 {
     $name = str_replace('\\', '/', trim((string) $name));
     if ($name === '' || preg_match('#^https?://#i', $name)) {
@@ -1252,7 +1258,7 @@ function media_library_is_standard_name($name)
  * 历史记录（本插件旧版把 zb_users/upload/... 或 upload/... 整段存入 ul_Name）：按前缀直达，不再逐层猜测
  * 找不到返回 ''；结果必须落在 zb_users/upload/ 内（realpath 包含校验，防穿越）
  */
-function media_library_disk_path($u)
+function at8_media_library_disk_path($u)
 {
     global $zbp;
     $uploadRoot = @realpath($zbp->usersdir . 'upload');
@@ -1261,7 +1267,7 @@ function media_library_disk_path($u)
     }
 
     // 1) 系统标准：FullFile = usersdir + Dir + Name
-    $file = media_library_realpath_in_upload($u->FullFile, $uploadRoot);
+    $file = at8_media_library_realpath_in_upload($u->FullFile, $uploadRoot);
     if ($file !== '') {
         return $file;
     }
@@ -1273,10 +1279,10 @@ function media_library_disk_path($u)
         return '';
     }
     if (strpos($name, 'zb_users/upload/') === 0) {
-        return media_library_realpath_in_upload($zbp->path . $name, $uploadRoot);
+        return at8_media_library_realpath_in_upload($zbp->path . $name, $uploadRoot);
     }
     if (strpos($name, 'upload/') === 0) {
-        return media_library_realpath_in_upload($zbp->usersdir . $name, $uploadRoot);
+        return at8_media_library_realpath_in_upload($zbp->usersdir . $name, $uploadRoot);
     }
     return '';
 }
@@ -1286,7 +1292,7 @@ function media_library_disk_path($u)
  * 标准记录：直接使用系统 $u->Url（内置 rawurlencode 与云存储接管 hook）
  * 历史记录：按存储前缀归一为站点根相对路径后逐段 rawurlencode（修复中文/空格文件名坏链）
  */
-function media_library_raw_path_url($siteRelPath)
+function at8_media_library_raw_path_url($siteRelPath)
 {
     global $zbp;
     $parts = explode('/', str_replace('\\', '/', ltrim((string) $siteRelPath, '/')));
@@ -1294,7 +1300,7 @@ function media_library_raw_path_url($siteRelPath)
     return $zbp->host . implode('/', $enc);
 }
 
-function media_library_upload_url($u)
+function at8_media_library_upload_url($u)
 {
     global $zbp;
     $name = str_replace('\\', '/', trim((string) $u->Name));
@@ -1303,10 +1309,10 @@ function media_library_upload_url($u)
         return $name; // 个别流程直接存完整 URL
     }
     if (stripos($name, 'zb_users/') === 0) {
-        return media_library_raw_path_url($name); // 历史格式：站点根相对
+        return at8_media_library_raw_path_url($name); // 历史格式：站点根相对
     }
     if (stripos($name, 'upload/') === 0) {
-        return media_library_raw_path_url('zb_users/' . $name); // 历史格式：zb_users 相对
+        return at8_media_library_raw_path_url('zb_users/' . $name); // 历史格式：zb_users 相对
     }
     return $u->Url; // 标准格式：系统属性
 }
@@ -1318,7 +1324,7 @@ function media_library_upload_url($u)
  * - 服务端可执行脚本（php/exe/js/html 等）无论何时都拒绝
  * - svg / svgz / xml / xsl / swf 等可内嵌脚本的格式默认排除，站点明确允许时才放行
  */
-function media_library_allow_exts()
+function at8_media_library_allow_exts()
 {
     global $zbp;
 
@@ -1362,7 +1368,7 @@ function media_library_allow_exts()
 /**
  * 是否图片类扩展名（图片需做内容校验）
  */
-function media_library_is_image_ext($ext)
+function at8_media_library_is_image_ext($ext)
 {
     return in_array(strtolower($ext), array('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico'));
 }
@@ -1370,7 +1376,7 @@ function media_library_is_image_ext($ext)
 /**
  * 服务器允许的单文件上限（取 upload_max_filesize 与 post_max_size 的较小值）
  */
-function media_library_max_upload_size()
+function at8_media_library_max_upload_size()
 {
     $to = function ($v) {
         $v = trim((string) $v);
@@ -1404,7 +1410,7 @@ function media_library_max_upload_size()
 /**
  * 上传错误码 -> 人话
  */
-function media_library_upload_error_text($code)
+function at8_media_library_upload_error_text($code)
 {
     $map = array(
         1 => '文件超过服务器限制（upload_max_filesize = ' . ini_get('upload_max_filesize') . '）',
@@ -1422,7 +1428,7 @@ function media_library_upload_error_text($code)
 /**
  * 探测文件 MIME
  */
-function media_library_detect_mime($file, $ext)
+function at8_media_library_detect_mime($file, $ext)
 {
     $mime = '';
     if (function_exists('finfo_open')) {
@@ -1459,42 +1465,42 @@ function media_library_detect_mime($file, $ext)
 /**
  * 保存上传的单个文件，返回 Upload 对象
  */
-function media_library_save_one($fileInfo, $logid)
+function at8_media_library_save_one($fileInfo, $logid)
 {
     global $zbp;
-    media_library_check_upload_rights();
+    at8_media_library_check_upload_rights();
 
     $err = isset($fileInfo['error']) ? (int) $fileInfo['error'] : 4;
     if ($err !== 0) {
-        media_library_error('上传失败：' . media_library_upload_error_text($err));
+        at8_media_library_error('上传失败：' . at8_media_library_upload_error_text($err));
     }
     if (!isset($fileInfo['tmp_name']) || !is_string($fileInfo['tmp_name']) || $fileInfo['tmp_name'] === '' || !is_uploaded_file($fileInfo['tmp_name'])) {
-        media_library_error('上传失败：请检查文件是否有效（' . media_library_display_name(isset($fileInfo['name']) ? $fileInfo['name'] : '') . '）');
+        at8_media_library_error('上传失败：请检查文件是否有效（' . at8_media_library_display_name(isset($fileInfo['name']) ? $fileInfo['name'] : '') . '）');
     }
 
     // 体积上限（跟随服务器 upload_max_filesize / post_max_size）
-    $max = media_library_max_upload_size();
+    $max = at8_media_library_max_upload_size();
     $size = (int) (isset($fileInfo['size']) ? $fileInfo['size'] : 0);
     if ($max > 0 && $size > $max) {
-        media_library_error('文件超过服务器上限 ' . media_library_size_text($max));
+        at8_media_library_error('文件超过服务器上限 ' . at8_media_library_size_text($max));
     }
 
-    $disk = media_library_safe_filename($fileInfo['name']);   // 落盘名（安全字符集）
-    $show = media_library_display_name($fileInfo['name']);    // 展示名（保留原始名称）
+    $disk = at8_media_library_safe_filename($fileInfo['name']);   // 落盘名（安全字符集）
+    $show = at8_media_library_display_name($fileInfo['name']);    // 展示名（保留原始名称）
     $dot = strrpos($disk, '.');
     $ext = ($dot !== false) ? strtolower(substr($disk, $dot + 1)) : '';
     $base = ($dot !== false) ? substr($disk, 0, $dot) : $disk;
-    $allow = media_library_allow_exts();
+    $allow = at8_media_library_allow_exts();
     if ($ext == '' || !in_array($ext, $allow)) {
-        media_library_error('不允许上传的类型：.' . $ext . '（可在后台「网站设置 → 允许上传的文件类型」中调整）');
+        at8_media_library_error('不允许上传的类型：.' . $ext . '（可在后台「网站设置 → 允许上传的文件类型」中调整）');
     }
 
     // 图片必须真的是图片（防止把脚本/可执行文件改名成图片上传）
-    if (media_library_is_image_ext($ext)) {
+    if (at8_media_library_is_image_ext($ext)) {
         $info = @getimagesize($fileInfo['tmp_name']);
-        $mime = strtolower((string) media_library_detect_mime($fileInfo['tmp_name'], $ext));
+        $mime = strtolower((string) at8_media_library_detect_mime($fileInfo['tmp_name'], $ext));
         if (!is_array($info) && strpos($mime, 'image/') !== 0) {
-            media_library_error('文件内容不是有效图片：' . $show);
+            at8_media_library_error('文件内容不是有效图片：' . $show);
         }
     }
 
@@ -1522,11 +1528,11 @@ function media_library_save_one($fileInfo, $logid)
     }
     $savedPath = $zbp->usersdir . $u->Dir . $diskName;
     if (!is_file($savedPath)) {
-        media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
+        at8_media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
     }
     @chmod($savedPath, 0644);
 
-    $mime = media_library_detect_mime($savedPath, $ext);
+    $mime = at8_media_library_detect_mime($savedPath, $ext);
     $u->SourceName = $show;
     $u->Size = (int) @filesize($savedPath);
     $u->MimeType = $mime;
@@ -1540,7 +1546,7 @@ function media_library_save_one($fileInfo, $logid)
 /**
  * 规范化 $_FILES 多文件结构
  */
-function media_library_normalize_files($key)
+function at8_media_library_normalize_files($key)
 {
     $out = array();
     if (!isset($_FILES[$key]) || !is_array($_FILES[$key]) || !isset($_FILES[$key]['name'])) {
@@ -1577,27 +1583,27 @@ function media_library_normalize_files($key)
 /**
  * 保存附件自定义信息
  */
-function media_library_update_meta($u, $p)
+function at8_media_library_update_meta($u, $p)
 {
     $title = (isset($p['title']) && is_string($p['title'])) ? trim($p['title']) : null;
     $alt = (isset($p['alt']) && is_string($p['alt'])) ? trim($p['alt']) : null;
     $intro = (isset($p['intro']) && is_string($p['intro'])) ? trim($p['intro']) : null;
 
     if ($title !== null) {
-        $u->Metas->media_title = media_library_clip($title, 200);
+        $u->Metas->media_title = at8_media_library_clip($title, 200);
     }
     if ($alt !== null) {
-        $u->Metas->media_alt = media_library_clip($alt, 200);
+        $u->Metas->media_alt = at8_media_library_clip($alt, 200);
     }
     if ($intro !== null) {
-        $u->Intro = media_library_clip($intro, 500);
+        $u->Intro = at8_media_library_clip($intro, 500);
     }
 }
 
 /**
  * 字符串截断（避免超长内容写库）
  */
-function media_library_clip($s, $len)
+function at8_media_library_clip($s, $len)
 {
     $s = (string) $s;
     if (function_exists('mb_strlen') && function_exists('mb_substr')) {
@@ -1612,7 +1618,7 @@ function media_library_clip($s, $len)
 /**
  * 记录敏感操作到系统日志（便于追溯）
  */
-function media_library_audit($text)
+function at8_media_library_audit($text)
 {
     if (function_exists('Logs')) {
         Logs('[media_library] ' . $text);
@@ -1624,21 +1630,20 @@ function media_library_audit($text)
  * 弹窗内列出关联到本文的图片并支持一键插入编辑器正文
  * （经 editor_api.editor.content.insert 官方接口，兼容 UEditor 等全部编辑器）
  */
-function media_library_edit_panel()
+function at8_media_library_edit_panel()
 {
     global $zbp;
-    if (!media_library_can_view()) {
+    if (!at8_media_library_can_view()) {
         return;
     }
+    $v = AT8_MEDIA_LIBRARY_VERSION;
     $api = $zbp->host . 'zb_users/plugin/at8_media_library/api.php';
-    $css = $zbp->host . 'zb_users/plugin/at8_media_library/css/style.css?v=' . MEDIA_LIBRARY_VERSION;
+    $css = $zbp->host . 'zb_users/plugin/at8_media_library/css/edit.css?v=' . $v;
+    $js = $zbp->host . 'zb_users/plugin/at8_media_library/script/edit.js?v=' . $v;
     $token = method_exists($zbp, 'GetCSRFToken') ? $zbp->GetCSRFToken() : '';
-    $safe = array(JSON_UNESCAPED_UNICODE, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    $apiJs = json_encode($api, $safe[0] | $safe[1]);
-    $tokenJs = json_encode($token, $safe[0] | $safe[1]);
-    $cssHtml = htmlspecialchars($css);
 
-    echo '<link rel="stylesheet" href="' . $cssHtml . '">' . "\n";
+    echo '<link rel="stylesheet" href="' . htmlspecialchars($css) . '">' . "\n";
+
     echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章附件</label>';
     echo '<div class="ml-panel-btns">'
         . '<button type="button" class="ml-panel-btn ml-panel-btn-primary" id="ml-edit-open">'
@@ -1646,30 +1651,9 @@ function media_library_edit_panel()
         . '<span>管理 / 插入附件</span></button>'
         . '</div></div>' . "\n";
 
-    // 弹窗样式独立作用域（ID 选择器 + 显式四边定位 + 高 z-index），不依赖后台环境样式
-    echo '<style id="ml-edit-style">' . "\n"
-        . '#ml-edit-panel .ml-panel-btns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:6px}' . "\n"
-        . '#ml-edit-panel .ml-panel-btn{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;font-family:inherit;font-size:13px;line-height:1.4;padding:7px 14px;border-radius:8px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;text-decoration:none;transition:all .15s;vertical-align:middle}' . "\n"
-        . '#ml-edit-panel .ml-panel-btn:hover{border-color:#2a5cf5;color:#2a5cf5;text-decoration:none}' . "\n"
-        . '#ml-edit-panel .ml-panel-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff;box-shadow:0 2px 8px rgba(42,92,245,.30)}' . "\n"
-        . '#ml-edit-panel .ml-panel-btn-primary:hover{background:#1f4ae0;color:#fff;box-shadow:0 4px 12px rgba(42,92,245,.38)}' . "\n"
-        . '#ml-edit-panel .ml-panel-btn svg{flex:0 0 auto}' . "\n"
-        . '#ml-edit-mask{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;background:rgba(9,14,25,.55);z-index:2147483000;display:none;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}' . "\n"
-        . '#ml-edit-mask.mlx-open{display:flex}' . "\n"
-        . 'body.ml-edit-modal-open [class*="toolbarbox"]{visibility:hidden}' . "\n"
-        . '#ml-edit-mask .mlx-modal{display:flex;flex-direction:column;background:#fff;border-radius:14px;width:780px;max-width:96vw;max-height:86vh;box-shadow:0 24px 70px rgba(9,14,25,.35);overflow:hidden;font-family:inherit}' . "\n"
-        . '#ml-edit-mask .mlx-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;background:#f7f9fd;border-bottom:1px solid #eef1f7;font-size:15px;font-weight:700;color:#1f2d3d}' . "\n"
-        . '#ml-edit-mask .mlx-modal-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' . "\n"
-        . '#ml-edit-mask .mlx-modal-close{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:12px;line-height:1;padding:6px 10px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#5b6b80;cursor:pointer;transition:all .15s}' . "\n"
-        . '#ml-edit-mask .mlx-modal-close:hover{border-color:#e5484d;color:#e5484d;background:#fef2f2}' . "\n"
-        . '#ml-edit-mask .mlx-modal-body{flex:1 1 auto;padding:14px 18px;font-size:13px;color:#3b4a5f;overflow:auto}' . "\n"
-        . '#ml-edit-mask .mlx-btn{display:inline-block;font-family:inherit;font-size:12px;line-height:1.4;padding:5px 12px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;transition:all .15s}' . "\n"
-        . '#ml-edit-mask .mlx-btn:hover{border-color:#2a5cf5;color:#2a5cf5}' . "\n"
-        . '#ml-edit-mask .mlx-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff}' . "\n"
-        . '#ml-edit-mask .mlx-btn-primary:hover{background:#1f4ae0;color:#fff}' . "\n"
-        . '</style>' . "\n";
 
-    echo '<div id="ml-edit-mask">'
+    // CSRF 令牌经 data 属性注入，由外置 script/edit.js 读取
+    echo '<div id="ml-edit-mask" data-api="' . htmlspecialchars($api) . '" data-token="' . htmlspecialchars($token) . '">'
         . '<div class="mlx-modal">'
         . '<div class="mlx-modal-head">'
         . '<span class="mlx-modal-title" id="ml-edit-modal-title">文章附件</span>'
@@ -1677,157 +1661,7 @@ function media_library_edit_panel()
         . '</div>'
         . '<div class="mlx-modal-body" id="ml-edit-body">加载中…</div>'
         . '</div></div>' . "\n";
-    ?>
-<script>
-(function () {
-	var API = <?php echo $apiJs; ?>;
-	var TOKEN = <?php echo $tokenJs; ?>;
-	function $(id) { return document.getElementById(id); }
-	function esc(s) {
-		return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-		});
-	}
-	function postId() {
-		var el = $('edtID');
-		var v = el ? parseInt(el.value, 10) : 0;
-		return isNaN(v) ? 0 : v;
-	}
-	function postTitle() {
-		var el = $('edtTitle');
-		return el ? el.value : '';
-	}
-	function api(data, cb) {
-		data.csrfToken = TOKEN;
-		var fd = new FormData();
-		for (var k in data) if (data.hasOwnProperty(k)) fd.append(k, data[k]);
-		var x = new XMLHttpRequest();
-		x.open('POST', API, true);
-		x.onreadystatechange = function () {
-			if (x.readyState !== 4) return;
-			var d = null;
-			try { d = JSON.parse(x.responseText); } catch (e) { }
-			if (d && d.code === 0) {
-				cb(d.data);
-			} else {
-				$('ml-edit-body').innerHTML = '<div style="padding:14px;color:#c0392b">' +
-					esc((d && d.msg) || ('请求失败（HTTP ' + x.status + '）')) + '</div>';
-			}
-		};
-		x.send(fd);
-	}
-	function insertHtml(html) {
-		try {
-			if (window.editor_api && editor_api.editor && editor_api.editor.content && editor_api.editor.content.insert) {
-				editor_api.editor.content.insert(html);
-			} else if (window.UE && UE.getEditor) {
-				UE.getEditor('editor_content').execCommand('inserthtml', html);
-			} else {
-				alert('未找到编辑器插入接口，请通过「复制 URL」手动插入');
-			}
-		} catch (e) {
-			alert('插入失败：' + e.message);
-		}
-	}
-	function render(items) {
-		var iconMap = { video: '🎬', audio: '🎵', doc: '📄', archive: '🗜️', other: '📦' };
-		function iconOf(kind) { return iconMap[kind] || '📄'; }
-		var imgs = [], files = [];
-		for (var i = 0; i < items.length; i++) {
-			if (items[i].kind === 'image') imgs.push(items[i]); else files.push(items[i]);
-		}
-		if (!imgs.length && !files.length) {
-			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">本文还没有关联附件。可在「媒体库」中关联，或经编辑器上传（自动关联本文）。</div>';
-			return;
-		}
-		function card(it, isImg) {
-			var badge = (typeof it.quoted === 'undefined') ? '' :
-				(it.quoted ? '<span style="color:#1a9e55">✅ 已引用</span>' : '<span style="color:#c07f00">⚠️ 未引用</span>');
-			var inner;
-			if (isImg) {
-				inner = '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;text-align:center">'
-					+ '<img src="' + esc(it.url) + '" style="max-width:100%;max-height:84px" alt=""></div>';
-			} else {
-				inner = '<div style="height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">'
-					+ '<span style="font-size:22px;line-height:1">' + esc(iconOf(it.kind)) + '</span>'
-					+ '<span style="font-size:11px;color:#5b6b80">' + esc(it.kind_label) + (it.size_text ? ' · ' + esc(it.size_text) : '') + '</span></div>';
-			}
-			var btn = isImg
-				? '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-mode="img" data-url="' + esc(it.url) + '" data-alt="' + esc(it.alt || it.title || it.name) + '">插入正文</button>'
-				: '<button type="button" class="mlx-btn mlx-btn-primary" style="margin-top:5px;width:100%" data-mode="link" data-url="' + esc(it.url) + '" data-alt="' + esc(it.name) + '">插入链接</button>';
-			return '<div style="width:150px;border:1px solid #e3e9f2;border-radius:8px;padding:6px;box-sizing:border-box">'
-				+ inner
-				+ '<div style="font-size:12px;margin:5px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(it.name) + '">' + esc(it.name) + '</div>'
-				+ '<div style="font-size:11px;color:#93a1b5;display:flex;justify-content:space-between"><span>' + (isImg ? esc(it.size_text) : esc(it.date_text || '')) + '</span>' + badge + '</div>'
-				+ btn
-				+ '</div>';
-		}
-		var h = '';
-		if (imgs.length) {
-			h += '<div style="padding:2px 6px 6px;font-size:12px;font-weight:700;color:#5b6b80">图片（点击插入正文）</div>';
-			h += '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
-			for (var j = 0; j < imgs.length; j++) h += card(imgs[j], true);
-			h += '</div>';
-		}
-		if (files.length) {
-			h += '<div style="padding:8px 6px 6px;font-size:12px;font-weight:700;color:#5b6b80">其他附件（点击插入下载链接）</div>';
-			h += '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0">';
-			for (var m = 0; m < files.length; m++) h += card(files[m], false);
-			h += '</div>';
-		}
-		$('ml-edit-body').innerHTML = h;
-		var btns = $('ml-edit-body').querySelectorAll('button[data-url]');
-		for (var k = 0; k < btns.length; k++) {
-			btns[k].addEventListener('click', function () {
-				var url = this.getAttribute('data-url');
-				var alt = this.getAttribute('data-alt');
-				// 二次转义：getAttribute 返回解码后的原始值，历史附件文件名可能含引号等字符，插入前必须重新转义
-				if (this.getAttribute('data-mode') === 'img') {
-					insertHtml('<p><img src="' + esc(url) + '" alt="' + esc(alt) + '"></p>');
-				} else {
-					insertHtml('<p><a href="' + esc(url) + '" target="_blank">' + esc(alt) + '</a></p>');
-				}
-			});
-		}
-	}
-	function load() {
-		var pid = postId();
-		if (!pid) {
-			$('ml-edit-modal-title').textContent = '文章附件';
-			$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">请先保存文章，再管理附件。</div>';
-			return;
-		}
-		$('ml-edit-modal-title').textContent = '文章附件 #' + pid + ' ' + postTitle();
-		$('ml-edit-body').innerHTML = '<div style="padding:18px;text-align:center;color:#93a1b5">加载中…</div>';
-		api({ act: 'list', logid: pid, perpage: 200, orderby: 'time' }, function (d) {
-			render(d.list || []);
-		});
-	}
-	function openMask() {
-		var mask = $('ml-edit-mask');
-		// 挂到 body 顶层：脱离右栏可能的层叠上下文，保证遮罩永远盖住全页
-		if (mask.parentElement !== document.body) document.body.appendChild(mask);
-		document.body.classList.add('ml-edit-modal-open');
-		mask.classList.add('mlx-open');
-		load();
-	}
-	function closeMask() {
-		$('ml-edit-mask').classList.remove('mlx-open');
-		document.body.classList.remove('ml-edit-modal-open');
-	}
-	$('ml-edit-open').addEventListener('click', function (e) {
-		e.preventDefault();
-		openMask();
-	});
-	$('ml-edit-close').addEventListener('click', closeMask);
-	$('ml-edit-mask').addEventListener('click', function (e) {
-		if (e.target === this) closeMask();
-	});
-	document.addEventListener('keydown', function (e) {
-		if (e.key === 'Escape' && $('ml-edit-mask').classList.contains('mlx-open')) closeMask();
-	});
-})();
-</script>
-	<?php
+    echo '<script src="' . htmlspecialchars($js) . '"></script>' . "\n";
 }
+
 
