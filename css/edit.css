@@ -1,0 +1,44 @@
+/* 文章编辑页「文章附件」面板 + 弹窗样式（独立作用域：ID 选择器 + 显式定位 + 高 z-index）
+ * 不依赖后台环境样式，任何编辑器/后台主题下均正确显示
+ * 弹窗遮罩挂载到 body 顶层（openMask() 中 appendChild） */
+
+/* ---- 右栏按钮 ---- */
+#ml-edit-panel .ml-panel-btns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:6px}
+#ml-edit-panel .ml-panel-btn{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;font-family:inherit;font-size:13px;line-height:1.4;padding:7px 14px;border-radius:8px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;text-decoration:none;transition:all .15s;vertical-align:middle}
+#ml-edit-panel .ml-panel-btn:hover{border-color:#2a5cf5;color:#2a5cf5;text-decoration:none}
+#ml-edit-panel .ml-panel-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff;box-shadow:0 2px 8px rgba(42,92,245,.30)}
+#ml-edit-panel .ml-panel-btn-primary:hover{background:#1f4ae0;color:#fff;box-shadow:0 4px 12px rgba(42,92,245,.38)}
+#ml-edit-panel .ml-panel-btn svg{flex:0 0 auto}
+
+/* ---- 遮罩与弹窗 ---- */
+#ml-edit-mask{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;background:rgba(9,14,25,.55);z-index:2147483000;display:none;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+#ml-edit-mask.mlx-open{display:flex}
+body.ml-edit-modal-open [class*="toolbarbox"]{visibility:hidden}
+#ml-edit-mask .mlx-modal{display:flex;flex-direction:column;background:#fff;border-radius:14px;width:780px;max-width:96vw;max-height:86vh;box-shadow:0 24px 70px rgba(9,14,25,.35);overflow:hidden;font-family:inherit}
+#ml-edit-mask .mlx-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;background:#f7f9fd;border-bottom:1px solid #eef1f7;font-size:15px;font-weight:700;color:#1f2d3d}
+#ml-edit-mask .mlx-modal-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#ml-edit-mask .mlx-modal-close{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:12px;line-height:1;padding:6px 10px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#5b6b80;cursor:pointer;transition:all .15s}
+#ml-edit-mask .mlx-modal-close:hover{border-color:#e5484d;color:#e5484d;background:#fef2f2}
+#ml-edit-mask .mlx-modal-body{flex:1 1 auto;padding:14px 18px;font-size:13px;color:#3b4a5f;overflow:auto}
+#ml-edit-mask .mlx-btn{display:inline-block;font-family:inherit;font-size:12px;line-height:1.4;padding:5px 12px;border-radius:6px;border:1px solid #d7deeb;background:#fff;color:#3b4a5f;cursor:pointer;transition:all .15s}
+#ml-edit-mask .mlx-btn:hover{border-color:#2a5cf5;color:#2a5cf5}
+#ml-edit-mask .mlx-btn-primary{background:#2a5cf5;border-color:#2a5cf5;color:#fff}
+#ml-edit-mask .mlx-btn-primary:hover{background:#1f4ae0;color:#fff}
+
+/* ---- 弹窗内容（原 JS 内联 style 收敛为 class） ---- */
+#ml-edit-mask .mlx-empty{padding:18px;text-align:center;color:#93a1b5}
+#ml-edit-mask .mlx-err{padding:14px;color:#c0392b}
+#ml-edit-mask .mlx-group-title{padding:2px 6px 6px;font-size:12px;font-weight:700;color:#5b6b80}
+#ml-edit-mask .mlx-group-title:not(:first-child){padding-top:8px}
+#ml-edit-mask .mlx-row{display:flex;flex-wrap:wrap;gap:10px;padding:4px 0}
+#ml-edit-mask .mlx-card{width:150px;border:1px solid #e3e9f2;border-radius:8px;padding:6px;box-sizing:border-box}
+#ml-edit-mask .mlx-card-thumb{height:84px;overflow:hidden;border-radius:6px;background:#f3f6fb;text-align:center}
+#ml-edit-mask .mlx-card-thumb img{max-width:100%;max-height:84px}
+#ml-edit-mask .mlx-card-thumb.is-file{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+#ml-edit-mask .mlx-card-icon{font-size:22px;line-height:1}
+#ml-edit-mask .mlx-card-type{font-size:11px;color:#5b6b80}
+#ml-edit-mask .mlx-card-name{font-size:12px;margin:5px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ml-edit-mask .mlx-card-meta{font-size:11px;color:#93a1b5;display:flex;justify-content:space-between}
+#ml-edit-mask .mlx-card-btn{margin-top:5px;width:100%}
+#ml-edit-mask .mlx-quoted{color:#1a9e55}
+#ml-edit-mask .mlx-unquoted{color:#c07f00}

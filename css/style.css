@@ -945,3 +945,8 @@
 		right: -100%;
 	}
 }
+
+/* 引用状态警示色（详情抽屉，替代内联 style） */
+.mlx-quote-warn { color: #b8860b; }
+.mlx-quote-err { color: #c0392b; }
+.mlx-missing { color: #c0392b; }

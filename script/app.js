@@ -6,7 +6,7 @@
 (function () {
 	'use strict';
 
-	var state = {
+	let state = {
 		view: 'grid',
 		page: 1,
 		perpage: ML.perpage || 48,
@@ -33,7 +33,7 @@
 	function $(id) { return document.getElementById(id); }
 
 	function el(tag, cls, text) {
-		var e = document.createElement(tag);
+		let e = document.createElement(tag);
 		if (cls) e.className = cls;
 		if (text !== undefined && text !== null) e.textContent = text;
 		return e;
@@ -46,9 +46,9 @@
 	}
 
 	function debounce(fn, ms) {
-		var t = null;
+		let t = null;
 		return function () {
-			var args = arguments, self = this;
+			let args = arguments, self = this;
 			clearTimeout(t);
 			t = setTimeout(function () { fn.apply(self, args); }, ms);
 		};
@@ -56,7 +56,7 @@
 
 	function copyText(text, okMsg) {
 		function fallback() {
-			var ta = document.createElement('textarea');
+			let ta = document.createElement('textarea');
 			ta.value = text;
 			ta.style.position = 'fixed';
 			ta.style.opacity = '0';
@@ -73,9 +73,9 @@
 		}
 	}
 
-	var toastTimer = null;
+	let toastTimer = null;
 	function toast(msg, isErr) {
-		var t = $('ml-toast');
+		let t = $('ml-toast');
 		if (!t) {
 			t = el('div');
 			t.id = 'ml-toast';
@@ -92,13 +92,13 @@
 
 	// ---------- API ----------
 	function apiGet(params, cb) {
-		var qs = [];
-		for (var k in params) {
+		let qs = [];
+		for (let k in params) {
 			if (params.hasOwnProperty(k) && params[k] !== '' && params[k] !== null && params[k] !== undefined) {
 				qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
 			}
 		}
-		var xhr = new XMLHttpRequest();
+		let xhr = new XMLHttpRequest();
 		xhr.open('GET', ML.api + '?' + qs.join('&'), true);
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState !== 4) return;
@@ -109,7 +109,7 @@
 
 	function apiPost(formData, cb, onFail) {
 		formData.append('csrfToken', ML.csrfToken || '');
-		var xhr = new XMLHttpRequest();
+		let xhr = new XMLHttpRequest();
 		xhr.open('POST', ML.api, true);
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState !== 4) return;
@@ -119,11 +119,11 @@
 	}
 
 	function handleJson(xhr, cb, onFail) {
-		var data;
+		let data;
 		try {
 			data = JSON.parse(xhr.responseText);
 		} catch (e) {
-			var msg = serverErrorText(xhr.responseText);
+			let msg = serverErrorText(xhr.responseText);
 			// 仅凭 HTTP 401 判定登录失效；超时/500 等服务端错误直接展示可读原因
 			if (xhr.status === 401) {
 				toast('登录已失效，请刷新页面重新登录', true);
@@ -147,13 +147,13 @@
 	// 从系统错误页里提取可读的报错文本（服务端 500 时用）
 	function serverErrorText(html) {
 		if (!html) return '';
-		var t = String(html)
+		let t = String(html)
 			.replace(/<script[\s\S]*?<\/script>/gi, ' ')
 			.replace(/<style[\s\S]*?<\/style>/gi, ' ');
-		var m = t.match(/<title>([\s\S]*?)<\/title>/i);
-		var title = m ? m[1] : '';
+		let m = t.match(/<title>([\s\S]*?)<\/title>/i);
+		let title = m ? m[1] : '';
 		t = t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-		var cut = t.search(/可能的错误原因|如果您是访客/);
+		let cut = t.search(/可能的错误原因|如果您是访客/);
 		if (cut > 0) t = t.slice(0, cut).trim();
 		if (!t) t = title.replace(/\s+/g, ' ').trim();
 		return t.slice(0, 160);
@@ -199,35 +199,35 @@
 			$('ml-st-unused').textContent = d.unused;
 
 			// 分类下拉
-			var cate = $('ml-cate');
+			let cate = $('ml-cate');
 			cate.innerHTML = '<option value="">全部分类</option>';
-			var oNone = document.createElement('option');
+			let oNone = document.createElement('option');
 			oNone.value = 'none';
 			oNone.textContent = '未关联附件';
 			cate.appendChild(oNone);
 			(d.categories || []).forEach(function (c) {
-				var pad = c.parentid > 0 ? '　' : '';
-				var o = document.createElement('option');
+				let pad = c.parentid > 0 ? '　' : '';
+				let o = document.createElement('option');
 				o.value = c.id;
 				o.textContent = pad + c.name;
 				cate.appendChild(o);
 			});
 
 			// 月份下拉
-			var month = $('ml-month');
+			let month = $('ml-month');
 			month.innerHTML = '<option value="">全部月份</option>';
 			(d.months || []).forEach(function (m) {
-				var o = document.createElement('option');
+				let o = document.createElement('option');
 				o.value = m.month;
 				o.textContent = m.month + '（' + m.count + '）';
 				month.appendChild(o);
 			});
 
 			// 上传者下拉
-			var author = $('ml-author');
+			let author = $('ml-author');
 			author.innerHTML = '<option value="">全部上传者</option>';
 			(d.authors || []).forEach(function (a) {
-				var o = document.createElement('option');
+				let o = document.createElement('option');
 				o.value = a.id;
 				o.textContent = a.name + '（' + a.count + '）';
 				author.appendChild(o);
@@ -246,19 +246,19 @@
 
 	// ---------- 渲染 ----------
 	function kindIconText(kind, name) {
-		var dot = name.lastIndexOf('.');
-		var ext = dot >= 0 ? name.slice(dot + 1) : '?';
+		let dot = name.lastIndexOf('.');
+		let ext = dot >= 0 ? name.slice(dot + 1) : '?';
 		if (ext.length > 5) ext = ext.slice(0, 5);
 		return ext;
 	}
 
 	function thumbHtml(item) {
-		var badge = '';
+		let badge = '';
 		if (!item.exists) badge = '<span class="mlx-badge mlx-badge-missing">文件缺失</span>';
 		else if (item.kind === 'image') badge = '<span class="mlx-badge">' + esc(item.kind_label) + (item.width ? ' ' + item.width + '×' + item.height : '') + '</span>';
 		else badge = '<span class="mlx-badge">' + esc(item.kind_label) + '</span>';
 
-		var inner;
+		let inner;
 		if (item.kind === 'image' && item.exists) {
 			inner = '<img src="' + esc(item.url) + '" alt="' + esc(item.alt || item.name) + '" loading="lazy">';
 		} else if (item.kind === 'video' && item.exists) {
@@ -267,8 +267,8 @@
 			inner = '<div class="mlx-fileicon"><div class="mlx-icon">' + esc(kindIconText(item.kind, item.name)) + '</div></div>';
 		}
 
-		var sub = item.size_text + ' · ' + item.date_text.split(' ')[0];
-		var cate = item.cate_name ? '<span class="mlx-meta-cate" title="关联文章：' + esc(item.post_title) + '">' + esc(item.cate_name) + '</span>' : '';
+		let sub = item.size_text + ' · ' + item.date_text.split(' ')[0];
+		let cate = item.cate_name ? '<span class="mlx-meta-cate" title="关联文章：' + esc(item.post_title) + '">' + esc(item.cate_name) + '</span>' : '';
 
 		return '<div class="mlx-thumb">' + inner + badge +
 			'<span class="mlx-check" title="选择"></span></div>' +
@@ -277,10 +277,10 @@
 	}
 
 	function renderGrid() {
-		var box = $('ml-grid');
+		let box = $('ml-grid');
 		box.innerHTML = '';
 		state.list.forEach(function (item) {
-			var card = el('div', 'mlx-card');
+			let card = el('div', 'mlx-card');
 			if (state.selected[item.id]) card.className += ' selected';
 			card.setAttribute('data-id', item.id);
 			card.innerHTML = thumbHtml(item);
@@ -290,7 +290,7 @@
 				if (e.target.className.indexOf('mlx-check') >= 0) return;
 				openDrawer(item.id);
 			});
-			var check = card.querySelector('.mlx-check');
+			let check = card.querySelector('.mlx-check');
 			check.addEventListener('click', function (e) {
 				e.stopPropagation();
 				toggleSelect(item.id);
@@ -300,15 +300,15 @@
 	}
 
 	function toggleSelect(id) {
-		var item = findItem(id);
+		let item = findItem(id);
 		if (state.selected[id]) {
 			delete state.selected[id];
 		} else if (item) {
 			state.selected[id] = item;
 		}
-		var cards = $('ml-grid').children;
-		for (var i = 0; i < cards.length; i++) {
-			var cid = cards[i].getAttribute('data-id');
+		let cards = $('ml-grid').children;
+		for (let i = 0; i < cards.length; i++) {
+			let cid = cards[i].getAttribute('data-id');
 			if (state.selected[cid]) cards[i].className = 'mlx-card selected';
 			else cards[i].className = 'mlx-card';
 		}
@@ -317,21 +317,21 @@
 
 	function findItem(id) {
 		id = String(id);
-		for (var i = 0; i < state.list.length; i++) {
+		for (let i = 0; i < state.list.length; i++) {
 			if (String(state.list[i].id) === id) return state.list[i];
 		}
 		return null;
 	}
 
 	function updateBulkBar() {
-		var n = 0;
-		for (var k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
+		let n = 0;
+		for (let k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
 		$('ml-bulkbar').style.display = n > 0 ? 'flex' : 'none';
 		$('ml-sel-count').textContent = n;
 	}
 
 	function renderPager() {
-		var box = $('ml-pager');
+		let box = $('ml-pager');
 		box.innerHTML = '';
 		if (state.pages <= 1) {
 			box.innerHTML = '<span style="color:#93a1b5;font-size:12px">共 ' + state.total + ' 个附件</span>';
@@ -339,7 +339,7 @@
 		}
 		function addBtn(label, page, opts) {
 			opts = opts || {};
-			var b = el('button');
+			let b = el('button');
 			b.textContent = label;
 			if (opts.active) b.className = 'active';
 			if (opts.disabled) b.disabled = true;
@@ -351,15 +351,15 @@
 			});
 			box.appendChild(b);
 		}
-		var start = Math.max(1, state.page - 2);
-		var end = Math.min(state.pages, state.page + 2);
+		let start = Math.max(1, state.page - 2);
+		let end = Math.min(state.pages, state.page + 2);
 		addBtn('«', 1, { disabled: state.page === 1 });
 		addBtn('‹', state.page - 1, { disabled: state.page === 1 });
 		if (start > 1) {
 			addBtn('1', 1);
 			if (start > 2) box.appendChild(el('span', '', '…'));
 		}
-		for (var i = start; i <= end; i++) addBtn(String(i), i, { active: i === state.page });
+		for (let i = start; i <= end; i++) addBtn(String(i), i, { active: i === state.page });
 		if (end < state.pages) {
 			if (end < state.pages - 1) box.appendChild(el('span', '', '…'));
 			addBtn(String(state.pages), state.pages);
@@ -370,12 +370,12 @@
 
 	// ---------- 详情抽屉 ----------
 	function openDrawer(id) {
-		var item = findItem(id);
+		let item = findItem(id);
 		if (!item) return;
 		state.current = item;
-		var dw = $('ml-drawer');
+		let dw = $('ml-drawer');
 
-		var preview;
+		let preview;
 		if (item.kind === 'image' && item.exists) {
 			preview = '<div class="mlx-dw-preview"><img id="ml-dw-img" src="' + esc(item.url) + '" alt=""></div>';
 		} else if (item.kind === 'video' && item.exists) {
@@ -386,8 +386,8 @@
 			preview = '<div class="mlx-dw-preview"><div class="mlx-fileicon"><div class="mlx-icon">' + esc(kindIconText(item.kind, item.name)) + '</div>' + esc(item.kind_label) + '</div></div>';
 		}
 
-		var canEdit = ML.canUpload;
-		var infoRows =
+		let canEdit = ML.canUpload;
+		let infoRows =
 			'<tr><td>URL</td><td>' + esc(item.url) + '</td></tr>' +
 			'<tr><td>类型</td><td>' + esc(item.kind_label) + ' / ' + esc(item.mime || '-') + '</td></tr>' +
 			'<tr><td>大小</td><td>' + esc(item.size_text) + (item.width ? ' · ' + item.width + '×' + item.height + ' px' : '') + '</td></tr>' +
@@ -433,42 +433,42 @@
 
 		$('ml-dw-close').addEventListener('click', closeDrawer);
 
-		var img = $('ml-dw-img');
+		let img = $('ml-dw-img');
 		if (img) img.addEventListener('click', function () { openLightbox(id); });
 
 		// 引用检测：关联文章的正文中是否实际引用了该附件
 		if (item.logid > 0) {
-			var qfd = new FormData();
+			let qfd = new FormData();
 			qfd.append('act', 'quotecheck');
 			qfd.append('id', item.id);
 			apiPost(qfd, function (q) {
-				var cell = $('ml-dw-quote');
+				let cell = $('ml-dw-quote');
 				if (!cell) return; // 抽屉已关闭
 				if (q && q.state === 'missing') {
 					cell.innerHTML = '<span class="mlx-missing">关联的文章不存在（可能已删除）</span>';
 				} else if (q && q.quoted) {
 					cell.innerHTML = '✅ 已在正文引用';
 				} else {
-					cell.innerHTML = '<span style="color:#b8860b">⚠️ 仅关联未引用</span>';
+					cell.innerHTML = '<span class="mlx-quote-warn">⚠️ 仅关联未引用</span>';
 				}
 			}, function () {
-				var cell = $('ml-dw-quote');
+				let cell = $('ml-dw-quote');
 				if (!cell) return;
-				cell.innerHTML = '<span style="color:#c0392b">检测失败，请重试</span>';
+				cell.innerHTML = '<span class="mlx-quote-err">检测失败，请重试</span>';
 			});
 		}
 
 		$('ml-dw-copyurl').addEventListener('click', function () { copyText(item.url, 'URL 已复制'); });
 		$('ml-dw-copyhtml').addEventListener('click', function () {
-			var alt = item.alt || item.title || item.name;
-			var html = item.kind === 'image'
+			let alt = item.alt || item.title || item.name;
+			let html = item.kind === 'image'
 				? '<img src="' + item.url + '" alt="' + alt + '">'
 				: '<a href="' + item.url + '">' + esc(item.name) + '</a>';
 			copyText(html, 'HTML 代码已复制');
 		});
 		$('ml-dw-copymd').addEventListener('click', function () {
-			var alt = item.alt || item.title || item.name;
-			var md = item.kind === 'image'
+			let alt = item.alt || item.title || item.name;
+			let md = item.kind === 'image'
 				? '![' + alt + '](' + item.url + ')'
 				: '[' + item.name + '](' + item.url + ')';
 			copyText(md, 'Markdown 已复制');
@@ -478,7 +478,7 @@
 
 		$('ml-dw-del').addEventListener('click', function () {
 			if (!window.confirm('确定删除「' + item.name + '」？此操作会同时删除文件与记录，不可恢复。')) return;
-			var fd = new FormData();
+			let fd = new FormData();
 			fd.append('act', 'delete');
 			fd.append('id', item.id);
 			apiPost(fd, function () {
@@ -492,9 +492,9 @@
 
 		$('ml-dw-replace').addEventListener('click', function () { $('ml-dw-file').click(); });
 		$('ml-dw-file').addEventListener('change', function () {
-			var f = this.files[0];
+			let f = this.files[0];
 			if (!f) return;
-			var fd = new FormData();
+			let fd = new FormData();
 			fd.append('act', 'replace');
 			fd.append('id', item.id);
 			fd.append('file', f);
@@ -508,7 +508,7 @@
 		});
 
 		// 取消关联：清空隐藏域，保存时以 logid=0 提交解除关联
-		var unlinkBtn = $('ml-dw-unlink');
+		let unlinkBtn = $('ml-dw-unlink');
 		if (unlinkBtn) {
 			unlinkBtn.addEventListener('click', function () {
 				$('ml-dw-logid').value = '';
@@ -518,7 +518,7 @@
 		}
 
 		$('ml-dw-save').addEventListener('click', function () {
-			var fd = new FormData();
+			let fd = new FormData();
 			fd.append('act', 'update');
 			fd.append('id', item.id);
 			fd.append('title', $('ml-dw-title').value);
@@ -539,9 +539,9 @@
 		});
 
 		// 关联文章搜索
-		var acBox = $('ml-dw-ac');
-		var doSearch = debounce(function () {
-			var q = $('ml-dw-post-q').value.trim();
+		let acBox = $('ml-dw-ac');
+		let doSearch = debounce(function () {
+			let q = $('ml-dw-post-q').value.trim();
 			apiGet({ act: 'posts', q: q }, function (list) {
 				acBox.innerHTML = '';
 				acBox.style.display = 'block';
@@ -550,7 +550,7 @@
 					return;
 				}
 				list.forEach(function (p) {
-					var it = el('div', 'mlx-ac-item');
+					let it = el('div', 'mlx-ac-item');
 					it.innerHTML = '<b>#' + p.id + '</b> ' + esc(p.title) + ' <span>' + (p.type === 1 ? '页面' : '文章') + '</span>';
 					if (p.id === state.current.logid) it.className += ' mlx-ac-active';
 					it.addEventListener('click', function () {
@@ -567,7 +567,7 @@
 	}
 
 	function refreshItem(d) {
-		for (var i = 0; i < state.list.length; i++) {
+		for (let i = 0; i < state.list.length; i++) {
 			if (state.list[i].id === d.id) { state.list[i] = d; break; }
 		}
 		renderGrid();
@@ -590,7 +590,7 @@
 	}
 
 	function addUploadRow(name) {
-		var row = el('div', 'mlx-up-item');
+		let row = el('div', 'mlx-up-item');
 		row.innerHTML = '<span class="mlx-up-name">' + esc(name) + '</span>' +
 			'<span class="mlx-up-bar"><i></i></span>' +
 			'<span class="mlx-up-status">…</span>';
@@ -601,10 +601,10 @@
 	function uploadFiles(files) {
 		if (!ML.canUpload) { toast('没有上传权限', true); return; }
 		if (!files || !files.length) return;
-		var logid = $('ml-upload-logid').value || '0';
+		let logid = $('ml-upload-logid').value || '0';
 
-		var arr = [];
-		for (var i = 0; i < files.length; i++) arr.push(files[i]);
+		let arr = [];
+		for (let i = 0; i < files.length; i++) arr.push(files[i]);
 
 		// 单文件逐个上传，便于展示各自进度
 		function next(idx) {
@@ -614,27 +614,27 @@
 				loadStats();
 				return;
 			}
-			var f = arr[idx];
-			var row = addUploadRow(f.name);
-			var fd = new FormData();
+			let f = arr[idx];
+			let row = addUploadRow(f.name);
+			let fd = new FormData();
 			fd.append('act', 'upload');
 			fd.append('csrfToken', ML.csrfToken || '');
 			fd.append('logid', logid);
 			fd.append('files', f, f.name);
 
-			var xhr = new XMLHttpRequest();
+			let xhr = new XMLHttpRequest();
 			xhr.open('POST', ML.api, true);
 			xhr.upload.onprogress = function (e) {
 				if (e.lengthComputable) {
-					var pct = Math.round(e.loaded / e.total * 100);
+					let pct = Math.round(e.loaded / e.total * 100);
 					row.querySelector('.mlx-up-bar i').style.width = pct + '%';
 					row.querySelector('.mlx-up-status').textContent = pct + '%';
 				}
 			};
 			xhr.onreadystatechange = function () {
 				if (xhr.readyState !== 4) return;
-				var st = row.querySelector('.mlx-up-status');
-				var data = null;
+				let st = row.querySelector('.mlx-up-status');
+				let data = null;
 				try { data = JSON.parse(xhr.responseText); } catch (e) {}
 				if (data && data.code === 0) {
 					st.textContent = '完成';
@@ -656,13 +656,13 @@
 
 	// ---------- 灯箱 ----------
 	function openLightbox(id) {
-		var imgs = [];
+		let imgs = [];
 		state.list.forEach(function (it, idx) {
 			if (it.kind === 'image' && it.exists) imgs.push(it);
 		});
 		if (!imgs.length) return;
-		var idx = 0;
-		for (var i = 0; i < imgs.length; i++) {
+		let idx = 0;
+		for (let i = 0; i < imgs.length; i++) {
 			if (imgs[i].id === id) { idx = i; break; }
 		}
 		state.lightboxImgs = imgs;
@@ -670,12 +670,12 @@
 	}
 
 	function showLightbox(idx) {
-		var imgs = state.lightboxImgs;
+		let imgs = state.lightboxImgs;
 		if (!imgs.length) return;
 		if (idx < 0) idx = imgs.length - 1;
 		if (idx >= imgs.length) idx = 0;
 		state.lightboxIndex = idx;
-		var it = imgs[idx];
+		let it = imgs[idx];
 		$('ml-lb-img').src = it.url;
 		$('ml-lb-caption').textContent = it.name + (it.width ? '（' + it.width + '×' + it.height + '）' : '') + ' · ' + (idx + 1) + '/' + imgs.length;
 		$('ml-lightbox').className = 'mlx-lightbox open';
@@ -688,7 +688,7 @@
 	// ---------- 弹窗（批量关联） ----------
 	function showBindModal() {
 		if ($('ml-modal')) return; // 防止快速双击叠出重复弹窗
-		var mask = el('div', 'mlx-modal-mask');
+		let mask = el('div', 'mlx-modal-mask');
 		mask.id = 'ml-modal';
 		mask.innerHTML =
 			'<div class="mlx-modal">' +
@@ -704,25 +704,25 @@
 			'</div></div>';
 		document.body.appendChild(mask);
 
-		var target = null;
+		let target = null;
 		mask.addEventListener('click', function (e) { if (e.target === mask) mask.parentNode.removeChild(mask); });
 		$('ml-bind-cancel').addEventListener('click', function () { mask.parentNode.removeChild(mask); });
 
 		function search() {
-			var q = $('ml-bind-q').value.trim();
+			let q = $('ml-bind-q').value.trim();
 			apiGet({ act: 'posts', q: q }, function (list) {
-				var box = $('ml-bind-ac');
+				let box = $('ml-bind-ac');
 				box.innerHTML = '';
 				if (!list.length) {
 					box.innerHTML = '<div class="mlx-ac-item">没有匹配的文章</div>';
 					return;
 				}
 				list.forEach(function (p) {
-					var it = el('div', 'mlx-ac-item');
+					let it = el('div', 'mlx-ac-item');
 					it.innerHTML = '<b>#' + p.id + '</b> ' + esc(p.title) + ' <span>' + (p.type === 1 ? '页面' : '文章') + '</span>';
 					it.addEventListener('click', function () {
-						var items = box.querySelectorAll('.mlx-ac-item');
-						for (var i = 0; i < items.length; i++) items[i].className = 'mlx-ac-item';
+						let items = box.querySelectorAll('.mlx-ac-item');
+						for (let i = 0; i < items.length; i++) items[i].className = 'mlx-ac-item';
 						it.className += ' mlx-ac-active';
 						target = p;
 						$('ml-bind-ok').disabled = false;
@@ -736,9 +736,9 @@
 
 		$('ml-bind-ok').addEventListener('click', function () {
 			if (!target) return;
-			var ids = [];
-			for (var k in state.selected) if (state.selected.hasOwnProperty(k)) ids.push(k);
-			var fd = new FormData();
+			let ids = [];
+			for (let k in state.selected) if (state.selected.hasOwnProperty(k)) ids.push(k);
+			let fd = new FormData();
 			fd.append('act', 'bulk');
 			fd.append('op', 'bind');
 			fd.append('ids', ids.join(','));
@@ -788,13 +788,13 @@
 		});
 
 		// 视图切换
-		var vsBtns = document.querySelectorAll('.mlx-vs-btn');
-		for (var i = 0; i < vsBtns.length; i++) {
+		let vsBtns = document.querySelectorAll('.mlx-vs-btn');
+		for (let i = 0; i < vsBtns.length; i++) {
 			vsBtns[i].addEventListener('click', function () {
-				for (var j = 0; j < vsBtns.length; j++) vsBtns[j].className = 'mlx-vs-btn';
+				for (let j = 0; j < vsBtns.length; j++) vsBtns[j].className = 'mlx-vs-btn';
 				this.className = 'mlx-vs-btn active';
 				state.view = this.getAttribute('data-view');
-				var root = document.querySelector('.mlx-root');
+				let root = document.querySelector('.mlx-root');
 				if (state.view === 'list') root.className = 'mlx-root mlx-listview';
 				else root.className = 'mlx-root';
 			});
@@ -811,16 +811,16 @@
 		});
 		$('ml-btn-bulkbind').addEventListener('click', showBindModal);
 		$('ml-btn-bulkdel').addEventListener('click', function () {
-			var n = 0;
-			for (var k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
+			let n = 0;
+			for (let k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
 			if (!n) return;
 			if (!window.confirm('确定删除选中的 ' + n + ' 个附件？文件与记录将一并删除，不可恢复。')) return;
-			var ids = [];
-			for (var key in state.selected) if (state.selected.hasOwnProperty(key)) ids.push(key);
+			let ids = [];
+			for (let key in state.selected) if (state.selected.hasOwnProperty(key)) ids.push(key);
 			// 分批请求：单次删除过多会触发 PHP 执行超时，服务端返回非 JSON 会被误判
-			var CHUNK = 20, done = 0, skipped = 0, failed = 0, pos = 0;
-			var next = function () {
-				var part = ids.slice(pos, pos + CHUNK);
+			let CHUNK = 20, done = 0, skipped = 0, failed = 0, pos = 0;
+			let next = function () {
+				let part = ids.slice(pos, pos + CHUNK);
 				if (!part.length) {
 					toast('已删除 ' + done + ' 个附件' + (skipped ? '，' + skipped + ' 个已跳过' : '') + (failed ? '，' + failed + ' 个删除失败，可重试' : ''), !!failed);
 					state.selected = {};
@@ -829,7 +829,7 @@
 					return;
 				}
 				pos += CHUNK;
-				var fd = new FormData();
+				let fd = new FormData();
 				fd.append('act', 'bulk');
 				fd.append('op', 'delete');
 				fd.append('ids', part.join(','));
@@ -856,7 +856,7 @@
 		});
 
 		// 整页拖拽
-		var dragDepth = 0;
+		let dragDepth = 0;
 		document.addEventListener('dragenter', function (e) {
 			e.preventDefault();
 			dragDepth++;
@@ -892,7 +892,7 @@
 
 		// 键盘
 		document.addEventListener('keydown', function (e) {
-			var lbOpen = $('ml-lightbox').className.indexOf('open') >= 0;
+			let lbOpen = $('ml-lightbox').className.indexOf('open') >= 0;
 			if (e.key === 'Escape' || e.keyCode === 27) {
 				if (lbOpen) closeLightbox();
 				else closeDrawer();
@@ -906,15 +906,15 @@
 	function init() {
 		// 页内动态元素
 		if (!$('ml-dropzone-tip')) {
-			var tip = el('div', 'mlx-dropzone-tip', '松开鼠标，上传到媒体库');
+			let tip = el('div', 'mlx-dropzone-tip', '松开鼠标，上传到媒体库');
 			tip.id = 'ml-dropzone-tip';
 			document.body.appendChild(tip);
 		}
 		// 上传面板可选文章（最近文章）
 		apiGet({ act: 'posts' }, function (list) {
-			var sel = $('ml-upload-logid');
+			let sel = $('ml-upload-logid');
 			list.slice(0, 10).forEach(function (p) {
-				var o = document.createElement('option');
+				let o = document.createElement('option');
 				o.value = p.id;
 				o.textContent = '关联：#' + p.id + ' ' + p.title.slice(0, 14);
 				sel.appendChild(o);
