@@ -26,14 +26,14 @@ if ($act == 'categories') {
     media_library_ok(media_library_categories());
 }
 
-// 文章搜索（关联下拉用，复用官方 GetPostList）
+// 文章搜索（关联下拉用，复用官方 GetPostList；注意官方签名第一参数是 $select）
 if ($act == 'posts') {
     $kw = trim(GetVars('q', 'GET'));
     $where = array();
     if ($kw != '') {
         $where[] = array('LIKE', 'log_Title', '%' . $kw . '%');
     }
-    $list = $zbp->GetPostList($where, array('log_PostTime' => 'DESC'), array(20));
+    $list = $zbp->GetPostList(null, $where, array('log_PostTime' => 'DESC'), array(20));
     $out = array();
     foreach ($list as $p) {
         $out[] = array(
