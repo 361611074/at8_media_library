@@ -25,7 +25,7 @@ function at8_media_library_AddLeftMenu(&$m)
     if (!at8_media_library_can_view()) {
         return; // 无查看附件权限的账号不显示入口
     }
-    $m[] = MakeLeftMenu("root", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "nav_at8_media_library", "aMediaLibrary", "");
+    $m[] = MakeLeftMenu("UploadMng", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "nav_at8_media_library", "aMediaLibrary", "");
 }
 
 function at8_media_library_AddTopMenu(&$m)
@@ -34,7 +34,7 @@ function at8_media_library_AddTopMenu(&$m)
     if (!at8_media_library_can_view()) {
         return;
     }
-    $m[] = MakeTopMenu("root", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "_self", "topmenu_at8_media_library");
+    $m[] = MakeTopMenu("UploadMng", "媒体库", $zbp->host . "zb_users/plugin/at8_media_library/main.php", "_self", "topmenu_at8_media_library");
 }
 
 function at8_media_library_UploadMngSubMenu(&$m = null)
@@ -73,9 +73,14 @@ function UninstallPlugin_at8_media_library()
     // 清理运行时文件缓存目录（插件目录下 cache/），保留配置与附件数据，卸载不删附件文件
     $dir = dirname(__FILE__) . '/cache';
     if (is_dir($dir)) {
-        $files = glob($dir . '/*');
+        // 两次 glob：* 不匹配 dotfile（如 .htaccess），.* 需剔除 . / ..
+        $files = array_merge((array) glob($dir . '/*'), (array) glob($dir . '/.*'));
         if (is_array($files)) {
             foreach ($files as $f) {
+                $base = basename($f);
+                if ($base === '.' || $base === '..') {
+                    continue;
+                }
                 if (is_file($f)) {
                     @unlink($f);
                 }
