@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.1');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.2');
 }
 
 /**
@@ -106,7 +106,9 @@ function at8_media_library_check_csrf()
     }
     // 官方校验函数失败时返回 JSON 而非系统 HTML 错误页
     $ok = function_exists('CheckCSRFTokenValid') && CheckCSRFTokenValid('csrfToken', array('post'));
-    if ($ok && $zbp->option['ZC_ADDITIONAL_SECURITY'] && function_exists('CheckHTTPRefererValid')) {
+    // ZC_ADDITIONAL_SECURITY 在部分站点/历史版本可能不存在，需 isset 守卫避免 debug 下报 Undefined array key
+    $addSec = isset($zbp->option['ZC_ADDITIONAL_SECURITY']) ? $zbp->option['ZC_ADDITIONAL_SECURITY'] : false;
+    if ($ok && $addSec && function_exists('CheckHTTPRefererValid')) {
         $ok = CheckHTTPRefererValid();
     }
     if (!$ok) {
@@ -1263,6 +1265,26 @@ function at8_media_library_is_standard_name($name)
 function at8_media_library_disk_path($u)
 {
     global $zbp;
+
+    // 请求内静态缓存：列表每行都会调用，避免同一请求内对同一附件重复 realpath/is_file 系统调用
+    static $mem = array();
+    $uid = (int) $u->ID;
+    $key = ($uid > 0 ? ('id' . $uid) : 'n') . '|' . (string) $u->FullFile . '|' . (string) $u->Name;
+    if (array_key_exists($key, $mem)) {
+        return $mem[$key];
+    }
+
+    $result = at8_media_library_disk_path_calc($u);
+    $mem[$key] = $result;
+    return $result;
+}
+
+/**
+ * 计算附件磁盘绝对路径（供 disk_path 调用，带请求内缓存）
+ */
+function at8_media_library_disk_path_calc($u)
+{
+    global $zbp;
     $uploadRoot = @realpath($zbp->usersdir . 'upload');
     if ($uploadRoot === false || $uploadRoot === '') {
         return '';
@@ -1630,7 +1652,7 @@ function at8_media_library_clip($s, $len)
 function at8_media_library_audit($text)
 {
     if (function_exists('Logs')) {
-        Logs('[media_library] ' . $text);
+        Logs('[at8_media_library] ' . $text);
     }
 }
 
