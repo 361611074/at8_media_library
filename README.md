@@ -52,6 +52,15 @@
 
 ## 更新日志
 
+### 1.4.1
+
+- 修复：文件缓存载荷由 `var_export` 改为 `base64(JSON)`——原 `?>` 防护替换为无效操作（替换前后字符相同），当分类名 / 作者名等进入缓存的数据含 PHP 结束标记时，缓存文件会被提前截断且持续损坏。base64 字符集不含标记字符，天然免疫；经含特殊字符数据的写读往返实测验证
+- 修复：进入媒体库后左侧菜单高亮失效——`ActiveLeftMenu()` 传入的菜单 id（`nav_media_library`）与注册的 `nav_at8_media_library` 不一致
+- 修复：菜单入口权限与实际访问权限不一致——左菜单 / 顶菜单原要求 `root` 级别，与 `can_view()` 允许的 `UploadMng` 不符，多作者站点上有附件管理权限的账号看不到入口；现统一为 `UploadMng`
+- 加固：上传文件名防双扩展名——主名任一段落为可执行脚本扩展名（`php*` / `phtml` / `phar` / `pht`）时拒绝（如 `shell.php.jpg`）
+- 修复：老附件记录 `SourceName` 为空时列表显示空名，回退显示磁盘文件名
+- 优化：卸载清理补齐 dotfile（原 `glob('*')` 不匹配 `.htaccess` 等隐藏文件）
+
 ### 1.4.0
 
 - 规范：自定义函数 / 常量前缀与应用 ID 统一——`media_library_*`（58 个函数）更名为 `at8_media_library_*`，`MEDIA_LIBRARY_VERSION` 更名为 `AT8_MEDIA_LIBRARY_VERSION`（对齐《注意事项速查表》03 条）
