@@ -229,14 +229,26 @@ if ($act == 'bulk') {
 
     if ($op == 'bind') {
         $logid = (int) GetVars('logid', 'POST');
+        $logid = max(0, $logid);
         $done = 0;
-        foreach ($idArr as $id) {
-            $u = $zbp->GetUploadByID($id);
-            if ($u->ID > 0) {
-                $u->LogID = max(0, $logid);
-                $u->Save();
-                $done++;
+        // 一次 IN 查询取回全部附件对象，避免逐条 N+1 查询
+        $sql = $zbp->db->sql->Select(
+            $zbp->table['Upload'],
+            '*',
+            array(array('IN', 'ul_ID', $idArr)),
+            null,
+            null
+        );
+        $res = $zbp->db->Query($sql);
+        foreach ($res as $r) {
+            $u = new Upload();
+            $u->LoadInfoByAssoc($r);
+            if ((int) $u->ID <= 0) {
+                continue;
             }
+            $u->LogID = $logid;
+            $u->Save();
+            $done++;
         }
         at8_media_library_stats_flush();
         at8_media_library_audit('批量关联 ' . $done . ' 个附件 -> 文章 #' . $logid);
