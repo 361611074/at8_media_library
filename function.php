@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.0');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.1');
 }
 
 /**
@@ -404,7 +404,7 @@ function at8_media_library_upload_row($u)
 
     $row = array();
     $row['id'] = (int) $u->ID;
-    $row['name'] = $u->SourceName;                    // 原始文件名
+    $row['name'] = ($u->SourceName !== '') ? $u->SourceName : basename($u->Name); // 原始文件名（老记录 SourceName 可能为空，回退磁盘名）
     $row['path'] = $u->Name;                          // 相对路径（原始存储值）
     $row['url'] = at8_media_library_upload_url($u);       // 完整 URL
     $row['size'] = (int) $u->Size;
@@ -925,9 +925,11 @@ function at8_media_library_cache_set($key, $data, $ttl = 0)
     // 3) Opcache 文件缓存（原子写入：临时文件 + rename）
     $dir = at8_media_library_cache_dir();
     if ($dir !== '') {
-        $export = var_export($payload, true);
-        $export = str_replace('?>', "?\x3E", $export); // 防止提前结束 PHP 标签
-        $code = "<?php\n// at8_media_library runtime cache\nreturn " . $export . ";\n";
+        // base64(JSON) 载荷：base64 字符集不含 '>'，天然免疫 PHP 结束标记提前截断；
+        // 也不依赖 var_export 的引号转义（var_export 对特殊字符的转义不可靠）
+        // 注意：本注释及本函数任何位置严禁出现字面 PHP 结束标记（连 // 注释里都会截断 PHP 模式）
+        $code = "<?php\n// at8_media_library runtime cache\nreturn json_decode(base64_decode('"
+            . base64_encode(json_encode($payload, JSON_UNESCAPED_UNICODE)) . "'), true);\n";
         $file = $dir . '/' . md5($key) . '.php';
         $tmp = $file . '.' . uniqid('', true) . '.tmp';
         if (@file_put_contents($tmp, $code, LOCK_EX) !== false) {
@@ -1493,6 +1495,13 @@ function at8_media_library_save_one($fileInfo, $logid)
     $allow = at8_media_library_allow_exts();
     if ($ext == '' || !in_array($ext, $allow)) {
         at8_media_library_error('不允许上传的类型：.' . $ext . '（可在后台「网站设置 → 允许上传的文件类型」中调整）');
+    }
+
+    // 防双扩展名：主名任一段为可执行脚本扩展名时拒绝（如 shell.php.jpg）
+    foreach (explode('.', $base) as $seg) {
+        if (preg_match('/^(php\d*|phtml|phar|pht)$/i', $seg)) {
+            at8_media_library_error('文件名包含可疑的可执行扩展名段（如 .php.），请重命名后再上传');
+        }
     }
 
     // 图片必须真的是图片（防止把脚本/可执行文件改名成图片上传）
