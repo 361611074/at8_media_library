@@ -151,7 +151,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 
 <script>window.ML = <?php echo $ml_config_json; ?>;</script>
 <script src="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/script/app.js?v=<?php echo AT8_MEDIA_LIBRARY_VERSION; ?>"></script>
-<script>if (typeof ActiveLeftMenu == "function") { ActiveLeftMenu("nav_media_library"); }</script>
+<script>if (typeof ActiveLeftMenu == "function") { ActiveLeftMenu("nav_at8_media_library"); }</script>
 <?php
 require $blogpath . 'zb_system/admin/admin_footer.php';
 RunTime();
