@@ -52,6 +52,14 @@
 
 ## 更新日志
 
+### 1.4.2
+
+- 修复：`check_csrf()` 直接读取 `$zbp->option['ZC_ADDITIONAL_SECURITY']` 未做存在性判断——部分站点 / 历史版本缺少该 option 时，debug（开发模式）下会抛 `Undefined array key` 并被渲染成错误页；现改为 `isset()` 守卫后取值
+- 优化：批量关联文章（bulk bind）由逐条 `GetUploadByID()` 改为一次 `IN` 查询取回全部附件对象，消除最多 500 次的 N+1 查询
+- 优化：附件磁盘路径解析 `disk_path()` 增加请求内静态缓存，列表渲染每行不再重复 `realpath()` / `is_file()` 系统调用
+- 规范：审计日志标签由 `[media_library]` 对齐为 `[at8_media_library]`，与插件 ID 一致便于检索
+- 规范：`plugin.xml` 的 `<modified>` 随版本同步更新
+
 ### 1.4.1
 
 - 修复：文件缓存载荷由 `var_export` 改为 `base64(JSON)`——原 `?>` 防护替换为无效操作（替换前后字符相同），当分类名 / 作者名等进入缓存的数据含 PHP 结束标记时，缓存文件会被提前截断且持续损坏。base64 字符集不含标记字符，天然免疫；经含特殊字符数据的写读往返实测验证
