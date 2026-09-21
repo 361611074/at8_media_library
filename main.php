@@ -94,7 +94,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 			</select>
 		</div>
 
-		<div class="mlx-bulkbar" id="ml-bulkbar" style="display:none">
+		<div class="mlx-bulkbar" id="ml-bulkbar">
 			<span>已选 <b id="ml-sel-count">0</b> 项</span>
 			<button type="button" class="mlx-btn mlx-btn-sm" id="ml-btn-selall">全选本页</button>
 			<button type="button" class="mlx-btn mlx-btn-sm" id="ml-btn-clearsel">取消选择</button>
@@ -104,12 +104,12 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 		</div>
 
 		<div class="mlx-grid" id="ml-grid"></div>
-		<div class="mlx-empty" id="ml-empty" style="display:none">
+		<div class="mlx-empty" id="ml-empty">
 			<p class="mlx-empty-icon">🗂</p>
 			<p>没有找到符合条件的附件</p>
 			<p class="mlx-empty-sub">试试调整筛选条件，或拖拽文件到此页面上传</p>
 		</div>
-		<div class="mlx-loading" id="ml-loading" style="display:none">加载中…</div>
+		<div class="mlx-loading" id="ml-loading">加载中…</div>
 
 		<div class="mlx-pager" id="ml-pager"></div>
 		<div class="mlx-sentinel" id="ml-sentinel"></div>
@@ -133,7 +133,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 	<div class="mlx-up-drop" id="ml-up-drop">
 		<p>点击选择文件，或拖拽到此处</p>
 		<p class="mlx-up-sub">支持图片、视频、音频、文档、压缩包，可多选</p>
-		<input type="file" id="ml-up-input" multiple style="display:none">
+		<input type="file" id="ml-up-input" multiple>
 	</div>
 	<div class="mlx-up-list" id="ml-up-list"></div>
 </div>
