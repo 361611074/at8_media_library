@@ -50,7 +50,47 @@
 
 卸载插件不会删除任何已上传的附件文件与数据库记录。
 
+## 开发者接口（v1.5.0 起）
+
+本插件对外暴露 7 个 Filter 接口，其他插件 / 主题在 `ActivePlugin_应用ID()` 中用官方 `Add_Filter_Plugin()` 挂载即可。`$arg` 声明 `&` 可修改，`$context` 为只读上下文、可不接收。
+
+| 接口名 | 回调签名 | 说明 |
+|---|---|---|
+| `Filter_Plugin_at8_media_library_AllowExts` | `(&$allow)` | 上传白名单过滤（硬拒绝清单 php/exe/svg 等不受影响） |
+| `Filter_Plugin_at8_media_library_ListWhere` | `(&$where, $p)` | 列表查询条件过滤（追加自定义筛选维度） |
+| `Filter_Plugin_at8_media_library_Thumb` | `(&$url, $upload)` | 缩略图地址接管（云存储 / CDN / 缩略图插件） |
+| `Filter_Plugin_at8_media_library_Row` | `(&$row, $upload)` | 附件行数据输出前过滤（追加自定义字段 / 徽标） |
+| `Filter_Plugin_at8_media_library_Stats` | `(&$stats)` | 统计口径过滤（覆盖缓存与重算全部返回路径） |
+| `Filter_Plugin_at8_media_library_UploadSucceed` | `($upload)` | 上传成功事件（生成缩略图、同步推送等后续处理） |
+| `Filter_Plugin_at8_media_library_DeleteSucceed` | `($upload)` | 删除成功事件（单个与批量删除均触发） |
+| `Filter_Plugin_at8_media_library_EditPanel` | `(&$html)` | 编辑页「文章附件」面板 HTML 过滤 |
+
+> 安全边界：接口基于官方 `DefinePluginFilter()` 声明机制，其他插件经 `Add_Filter_Plugin()` 挂载。`AllowExts` 仅放宽**插件层**白名单，系统官方 `Upload::SaveFile()` 的站点「允许上传的文件类型」校验仍然生效，无法借接口绕过系统安全检查。
+
+示例：放行自定义格式并接管缩略图
+
+```php
+RegisterPlugin("myapp", "ActivePlugin_myapp");
+function ActivePlugin_myapp() {
+  Add_Filter_Plugin('Filter_Plugin_at8_media_library_AllowExts', 'myapp_AllowExts');
+  Add_Filter_Plugin('Filter_Plugin_at8_media_library_Thumb', 'myapp_Thumb');
+}
+function myapp_AllowExts(&$allow) {
+  $allow[] = 'webmanifest'; // 追加自定义格式
+}
+function myapp_Thumb(&$url, $upload) {
+  if (in_array(pathinfo($upload->Name, PATHINFO_EXTENSION), array('jpg', 'png'))) {
+    $url = 'https://cdn.example.com/thumb/' . rawurlencode(basename($upload->Name));
+  }
+}
+```
+
 ## 更新日志
+
+### 1.5.0
+
+- 新增：对外暴露 7 组 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节
+- 新增：编辑页面板输出经接口过滤后再渲染（内容经输出缓冲捕获，不影响原有结构）
 
 ### 1.4.2
 
