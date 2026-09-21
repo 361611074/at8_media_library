@@ -81,6 +81,31 @@ function InstallPlugin_at8_media_library()
     }
 }
 
+/**
+ * 插件更新时调用（含旧版兼容别名 at8_media_library_Updated）
+ * 后续版本若新增/变更配置键，在此按 ConfigVer 逐级迁移
+ */
+function UpdatePlugin_at8_media_library()
+{
+    global $zbp;
+    $conf = $zbp->Config('at8_media_library');
+    $ver = (int) $conf->ConfigVer;
+    if ($ver < 1) {
+        // v1：确保 perpage 存在且合法（覆盖 v1.5.0 前的旧配置）
+        $perpage = (int) $conf->perpage;
+        if ($perpage <= 0) {
+            $conf->perpage = 48;
+        }
+        $conf->ConfigVer = 1;
+        $zbp->SaveConfig('at8_media_library');
+    }
+}
+// 旧版兼容（1.7 前的更新钩子命名）
+function at8_media_library_Updated()
+{
+    UpdatePlugin_at8_media_library();
+}
+
 function UninstallPlugin_at8_media_library()
 {
     // 清理运行时文件缓存目录（插件目录下 cache/），保留配置与附件数据，卸载不删附件文件
