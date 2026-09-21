@@ -950,3 +950,9 @@
 .mlx-quote-warn { color: #b8860b; }
 .mlx-quote-err { color: #c0392b; }
 .mlx-missing { color: #c0392b; }
+
+/* ---------- 初始隐藏（由 JS 内联样式控制显示，替代 HTML 内联 style） ---------- */
+.mlx-bulkbar,
+.mlx-empty,
+.mlx-loading,
+#ml-up-input { display: none; }
