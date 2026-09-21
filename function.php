@@ -8,7 +8,38 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.4.2');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.5.0');
+}
+
+/**
+ * 触发本插件的对外接口（官方机制：DefinePluginFilter 声明 + Add_Filter_Plugin 注册）
+ * $arg 按引用传入，挂载函数声明 (&$arg) 即可修改；$context 为只读上下文，挂载函数可不接收
+ */
+function at8_media_library_hook($name, &$arg, $context = null)
+{
+    $hook = 'Filter_Plugin_' . $name;
+    if (isset($GLOBALS['hooks'][$hook]) && is_array($GLOBALS['hooks'][$hook])) {
+        foreach ($GLOBALS['hooks'][$hook] as $fpname => &$fpsignal) {
+            if ($context === null) {
+                $fpname($arg);
+            } else {
+                $fpname($arg, $context);
+            }
+        }
+    } elseif (isset($GLOBALS[$hook]) && is_array($GLOBALS[$hook])) {
+        // 兼容旧式 $GLOBALS['Filter_Plugin_XXX'] 直挂数组
+        foreach ($GLOBALS[$hook] as $fpname => $fv) {
+            $fv = is_string($fv) ? $fv : $fpname;
+            if (is_callable($fv)) {
+                if ($context === null) {
+                    $fv($arg);
+                } else {
+                    $fv($arg, $context);
+                }
+            }
+        }
+    }
+    return $arg;
 }
 
 /**
@@ -408,7 +439,10 @@ function at8_media_library_upload_row($u)
     $row['id'] = (int) $u->ID;
     $row['name'] = ($u->SourceName !== '') ? $u->SourceName : basename($u->Name); // 原始文件名（老记录 SourceName 可能为空，回退磁盘名）
     $row['path'] = $u->Name;                          // 相对路径（原始存储值）
-    $row['url'] = at8_media_library_upload_url($u);       // 完整 URL
+    // 对外接口：其他插件（云存储 / 缩略图 / CDN 类）可接管缩略图地址
+    $url = at8_media_library_upload_url($u);
+    $url = at8_media_library_hook('at8_media_library_Thumb', $url, $u);
+    $row['url'] = $url;                               // 完整 URL
     $row['size'] = (int) $u->Size;
     $row['size_text'] = at8_media_library_size_text((int) $u->Size);
     $row['mime'] = $u->MimeType;
@@ -471,6 +505,8 @@ function at8_media_library_upload_row($u)
         $row['cate_name'] = '';
     }
 
+    // 对外接口：行数据输出前，其他插件可追加自定义字段 / 修改展示数据
+    $row = at8_media_library_hook('at8_media_library_Row', $row, $u);
     return $row;
 }
 
@@ -990,7 +1026,7 @@ function at8_media_library_stats()
     // 读缓存（优先 Redis / APCu / Opcache 文件缓存）
     $cached = at8_media_library_cache_get('stats');
     if (is_array($cached) && isset($cached['total'])) {
-        return $cached;
+        return at8_media_library_hook('at8_media_library_Stats', $cached);
     }
 
     // 兼容旧缓存：系统 cache 存储的 5 分钟缓存
@@ -1000,7 +1036,7 @@ function at8_media_library_stats()
         if ($raw !== '' && $ts > 0 && (time() - $ts) < at8_media_library_stats_ttl()) {
             $legacy = @json_decode($raw, true); // JSON 存储，避免 unserialize 的对象注入面
             if (is_array($legacy) && isset($legacy['total'])) {
-                return $legacy;
+                return at8_media_library_hook('at8_media_library_Stats', $legacy);
             }
         }
     }
@@ -1017,7 +1053,7 @@ function at8_media_library_stats()
         }
     }
 
-    return $data;
+    return at8_media_library_hook('at8_media_library_Stats', $data);
 }
 
 function at8_media_library_stats_compute()
@@ -1112,6 +1148,8 @@ function at8_media_library_list($p)
     $order = isset($orderMap[$orderby]) ? $orderMap[$orderby] : array('ul_PostTime' => 'DESC');
 
     $where = at8_media_library_build_where($p);
+    // 对外接口：其他插件可追加 / 修改查询条件（如自定义筛选维度）
+    $where = at8_media_library_hook('at8_media_library_ListWhere', $where, $p);
 
     // 总数
     $sql = $zbp->db->sql->Count($zbp->table['Upload'], array('COUNT', '*'), $where);
@@ -1386,6 +1424,8 @@ function at8_media_library_allow_exts()
         }
         $out[] = $ext;
     }
+    // 对外接口：其他插件可增删白名单（deny / risky 硬拒绝在后续检查中仍然生效）
+    $out = at8_media_library_hook('at8_media_library_AllowExts', $out);
     return $out;
 }
 
@@ -1673,6 +1713,7 @@ function at8_media_library_edit_panel()
     $js = $zbp->host . 'zb_users/plugin/at8_media_library/script/edit.js?v=' . $v;
     $token = method_exists($zbp, 'GetCSRFToken') ? $zbp->GetCSRFToken() : '';
 
+    ob_start();
     echo '<link rel="stylesheet" href="' . htmlspecialchars($css) . '">' . "\n";
 
     echo '<div id="ml-edit-panel" class="editmod"><label class="editinputname">文章附件</label>';
@@ -1693,6 +1734,10 @@ function at8_media_library_edit_panel()
         . '<div class="mlx-modal-body" id="ml-edit-body">加载中…</div>'
         . '</div></div>' . "\n";
     echo '<script src="' . htmlspecialchars($js) . '"></script>' . "\n";
+    $html = ob_get_clean();
+    // 对外接口：其他插件可修改编辑页面板输出（追加按钮、注入自定义区块等）
+    $html = at8_media_library_hook('at8_media_library_EditPanel', $html);
+    echo $html;
 }
 
 
