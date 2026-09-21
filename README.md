@@ -87,6 +87,11 @@ function myapp_Thumb(&$url, $upload) {
 
 ## 更新日志
 
+### 1.5.1
+
+- 规范：新增 `UpdatePlugin_at8_media_library()` 更新钩子（含旧版兼容别名 `at8_media_library_Updated()`），引入 `ConfigVer` 配置版本迁移机制，后续版本新增/变更配置键在此逐级迁移（对齐官方「启用/停止/更新插件时执行」规范）
+- 规范：后台管理页移除 4 处内联 `style="display:none"`（批量条 / 空态 / 加载态 / 文件选择框），初始隐藏改由 `style.css` 统一控制，JS 内联样式切换逻辑不受影响
+
 ### 1.5.0
 
 - 新增：对外暴露 7 组 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节
