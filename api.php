@@ -84,6 +84,8 @@ if ($act == 'upload') {
     $rows = array();
     foreach ($files as $f) {
         $u = at8_media_library_save_one($f, $logid);
+        // 对外接口：上传成功事件（其他插件可做缩略图生成、同步推送等后续处理）
+        at8_media_library_hook('at8_media_library_UploadSucceed', $u);
         $rows[] = at8_media_library_upload_row($u);
     }
     at8_media_library_stats_flush();
@@ -220,6 +222,8 @@ if ($act == 'bulk') {
             }
             at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
             $u->Del();
+            // 对外接口：删除成功事件（批量分支）
+            at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
             $done++;
         }
         $skip = count($idArr) - $done;
@@ -278,6 +282,8 @@ if ($act == 'delete') {
     }
     at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
     $u->Del();
+    // 对外接口：删除成功事件（单个分支）
+    at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
     at8_media_library_stats_flush();
     at8_media_library_ok(array('id' => $id));
 }
