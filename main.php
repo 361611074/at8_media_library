@@ -25,7 +25,8 @@ $ml_config = array(
     'api' => $zbp->host . 'zb_users/plugin/at8_media_library/api.php',
     'host' => $zbp->host,
     'csrfToken' => method_exists($zbp, 'GetCSRFToken') ? $zbp->GetCSRFToken() : (function_exists('csrfToken') ? csrfToken() : ''),
-    'canUpload' => ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root')) ? 1 : 0,
+    'canUpload' => (isset($GLOBALS['actions']['UploadPst']) ? $zbp->CheckRights('UploadPst') : ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root'))) ? 1 : 0,
+    'canDelete' => (isset($GLOBALS['actions']['UploadDel']) ? $zbp->CheckRights('UploadDel') : ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root'))) ? 1 : 0,
     'perpage' => $ml_perpage,
     'user' => $zbp->user->Name,
 );
@@ -46,7 +47,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 				<span class="mlx-stat"><b id="ml-st-unused">-</b> 未关联文章</span>
 			</div>
 			<div class="mlx-header-actions">
-				<?php if ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root')) { ?>
+				<?php if (isset($GLOBALS['actions']['UploadPst']) ? $zbp->CheckRights('UploadPst') : ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root'))) { ?>
 				<button type="button" class="mlx-btn mlx-btn-primary" id="ml-btn-upload">上传文件</button>
 				<?php } ?>
 				<a class="mlx-btn" href="<?php echo $zbp->host; ?>zb_system/admin/index.php?act=UploadMng">传统列表视图</a>
