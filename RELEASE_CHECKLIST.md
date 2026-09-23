@@ -1,4 +1,4 @@
-# at8_media_library 1.6.3 — 发布检查清单（RELEASE_CHECKLIST）
+# at8_media_library 1.6.4 — 发布检查清单（RELEASE_CHECKLIST）
 
 检查基准：《Z-BlogPHP 插件 AI Agent 开发规范》§29
 实测环境：Z-BlogPHP **1.7.5** / PHP 7.3.4（本地 `php -l`）+ PHP 8.2（测试站 zblog.xmm.fan）/ MySQL
@@ -10,7 +10,7 @@
 |---|---|---|
 | 插件 ID | `at8_media_library` | ✅ 由 `media_library` 改名后长期稳定（旧配置自动迁移） |
 | 插件名称 | 媒体库 · 相册式附件管理 | ✅ |
-| 版本号 | 1.6.3（`plugin.xml` 与 `AT8_MEDIA_LIBRARY_VERSION` 一致） | ✅ 十进制封十进一 |
+| 版本号 | 1.6.4（`plugin.xml` 与 `AT8_MEDIA_LIBRARY_VERSION` 一致） | ✅ 十进制封十进一 |
 | 前缀 | 函数 `at8_media_library_*`、PHP 常量 `AT8_MEDIA_LIBRARY_*`、CSS `.mlx-*` / `.ml-*`、JS `window.AT8ML`、配置键 `conf_Name=at8_media_library` | ✅ 本次将 `window.ML` 改名 `window.AT8ML` 以避免命名冲突 |
 | `plugin.xml` 必填节点 | 含 `<description>`、`<phpver>`；author/source 完整 | ✅ |
 | 作者与官网 | 漫步白月光 / https://www.at8.fun/ | ✅ |
@@ -20,7 +20,7 @@
 | 项 | 值 | 依据 |
 |---|---|---|
 | 最低 Z-BlogPHP | 1.7.x | 依赖 `Filter_Plugin_Admin_LeftMenu/TopMenu/UploadMng_SubMenu`、`Filter_Plugin_Edit_Response3`、`$zbp->Config()` 属性式、`CheckCSRFTokenValid` |
-| 最低 PHP | **7.0**（`plugin.xml` 显式声明；打包脚本读取，不再写死 5.2） | 缓存层使用 `Throwable`（PHP 7.0+）；实测 7.3.4 与 8.2 通过 |
+| 最低 PHP | **7.4**（`plugin.xml` 显式声明；打包脚本读取，不再写死 5.2） | ① 全量文件 PHP **7.3.4** 通过 `php -l`（严于 7.4）；② 运行时 PHP **8.2** 实测零报错；③ 无 PHP 8.0+ 专有语法（已全量扫描 `?->` / `match` 表达式 / `str_contains` / `#[Attribute]` / 构造器提升 / 联合类型 / `enum` / `readonly` 均 0 命中） |
 | 数据库 | MySQL / SQLite / PostgreSQL（另经 PDO 兼容 Redis 可选缓存） | 不建自定义表，仅使用系统 `zbp_upload` 与 `zbp_config` |
 | 第三方依赖 | 无（前端原生 JS，无 Composer、无 CDN） | §23 |
 
@@ -85,5 +85,5 @@
 
 ## 8. 发布物
 
-- `at8_media_library_1.6.3_20260923.zba`（70.3 KB，11 文件；已剔除 screenshots / README / CHANGELOG / RELEASE_CHECKLIST / cache / `.git`）
+- `at8_media_library_1.6.4_20260923.zba`（11 文件；已剔除 screenshots / README / CHANGELOG / RELEASE_CHECKLIST / cache / `.git`）
 - GitHub：https://github.com/361611074/at8_media_library

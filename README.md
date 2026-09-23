@@ -43,7 +43,7 @@
 ## 兼容性
 
 - 适用于 Z-BlogPHP 1.7.0 及以上版本。
-- 需要 PHP 7.0 及以上（缓存层使用 `Throwable` 捕获异常；`plugin.xml` 已声明 `<phpver>7.0</phpver>`）。
+- 需要 PHP 7.4 及以上（`plugin.xml` 声明 `<phpver>7.4</phpver>`，应用中心据此拒绝安装）。全量文件在 7.3.4 通过语法校验、运行时在 8.2 实测零报错，且未使用任何 PHP 8.0+ 专有语法。
 - 支持 MySQL、SQLite、PostgreSQL 三种数据库。
 - 数据查询全部使用系统自带的 SQL 构造器，不直接拼接 SQL 语句，不创建数据表，不修改系统文件。
 
@@ -87,6 +87,11 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.6.4（2026-09-23）
+
+- **最低 PHP 版本提高至 7.4**（`plugin.xml` 的 `<phpver>`，应用中心安装门槛）。依据：全量文件在 PHP 7.3.4 通过 `php -l`（严于 7.4）、运行时在 PHP 8.2 实测零报错、源码未使用任何 PHP 8.0+ 专有语法（已扫描确认无 `?->` / `match` 表达式 / `str_contains` / `#[Attribute]` / 构造器提升 / 联合类型 / `enum` / `readonly`）；
+- 同步更新 README「兼容性」中的 PHP 版本表述。
 
 ### 1.6.3
 
