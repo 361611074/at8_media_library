@@ -87,6 +87,16 @@ function myapp_Thumb(&$url, $upload) {
 
 ## 更新日志
 
+### 1.6.0
+
+- 安全：对齐官方附件管理的数据范围——无 `UploadAll` 权限的用户在列表、统计、筛选、引用检测、编辑页面板中仅能看到自己的附件，服务端强制注入查询条件，不信任前端参数（对齐官方 `Admin_UploadMng` 的 `ul_AuthorID` 过滤）
+- 安全：写操作权限细分对齐官方 `PostUpload` / `DelUpload`——上传/替换/编辑/关联使用 `UploadPst`，删除使用 `UploadDel`，`UploadAll` 仅用于操作其他用户的附件；无权限时他人附件在批量操作中计为跳过并返回成功/失败/跳过计数
+- 兼容：文件存在性判定不再依赖本地文件——系统标准记录一律视为可访问（URL 由系统 / 云存储 hook 提供），本地无文件仅显示「可能已转存云端」中性提示，不再误报「文件缺失」；图片、视频、音频预览直接使用官方附件 URL，对象存储（如 fui_oss 删除本地文件后）附件可正常显示与预览
+- 兼容：上传落盘校验放宽——`Filter_Plugin_Upload_SaveFile` 被存储插件接管时本地未落盘属预期行为，大小 / MIME 改从临时文件读取，兼容完全不保存本地文件的存储插件
+- 兼容：替换附件改走官方存储流程——先 `DelFile()`（触发云存储删除 hook）再 `SaveFile()`（触发云存储上传 hook），保证对象存储与数据库同步更新；旧格式记录维持本地直替
+- 规范：上传成功后经官方 `CountMemberArray()` 同步用户附件数并触发官方 `Filter_Plugin_PostUpload_Succeed` hook；删除成功后同步 `CountMemberArray(-1)`；删除文件失败时保留数据库记录并返回失败，不再出现「记录已删文件还在」
+- 规范：`plugin.xml` 的 `<adapted>` 改为 Z-BlogPHP 内部版本号（172900 = 1.7.0），`dependency` / `rewritefunctions` / `existsfunctions` / `conflict` 移入 `<advanced>` 节点
+
 ### 1.5.1
 
 - 规范：新增 `UpdatePlugin_at8_media_library()` 更新钩子（含旧版兼容别名 `at8_media_library_Updated()`），引入 `ConfigVer` 配置版本迁移机制，后续版本新增/变更配置键在此逐级迁移（对齐官方「启用/停止/更新插件时执行」规范）
