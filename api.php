@@ -68,7 +68,7 @@ if ($act == 'quotecheck') {
 if ($act == 'upload') {
     at8_media_library_check_csrf();
     at8_media_library_require_right('UploadPst'); // 官方权限项：上传
-    $logid = (int) GetVars('logid', 'POST');
+    $logid = at8_media_library_validate_logid((int) GetVars('logid', 'POST'));
     $files = at8_media_library_normalize_files('files');
     if (count($files) == 0) {
         $files = at8_media_library_normalize_files('file');
@@ -146,17 +146,42 @@ if ($act == 'replace') {
         if ($target !== '' && !is_writable(dirname($target))) {
             at8_media_library_error('替换失败，请检查目录写入权限');
         }
+        // 原文件备份：DelFile 与 SaveFile 之间任何一步失败时恢复，避免「记录在、文件丢」
+        $backup = '';
+        if ($target !== '' && is_file($target)) {
+            $tmpBak = @tempnam(sys_get_temp_dir(), 'at8ml_bak_');
+            if (is_string($tmpBak) && $tmpBak !== '' && @copy($target, $tmpBak)) {
+                $backup = $tmpBak;
+            }
+        }
+        $restore = function () use (&$backup, $u) {
+            if ($backup === '') {
+                return;
+            }
+            $p = at8_media_library_disk_path($u);
+            if ($p !== '' && !is_file($p)) {
+                @copy($backup, $p);
+            }
+            @unlink($backup);
+            $backup = '';
+        };
         $delRet = $u->DelFile();
         if ($delRet === false) {
+            $restore();
             at8_media_library_error('原文件删除失败（存储插件报告），已中止替换');
         }
         if (!$u->SaveFile($f['tmp_name'])) {
+            $restore();
             at8_media_library_error('替换失败：站点「允许上传的文件类型」设置与该扩展名冲突');
         }
         $storageHooked = !empty($GLOBALS['hooks']['Filter_Plugin_Upload_SaveFile']);
         $newPath = at8_media_library_disk_path($u);
         if ($newPath === '' && !$storageHooked) {
+            $restore();
             at8_media_library_error('替换失败，请检查目录写入权限');
+        }
+        if ($backup !== '') {
+            @unlink($backup);
         }
         $statFile = ($newPath !== '') ? $newPath : $f['tmp_name'];
         $u->SourceName = $orig;
@@ -195,7 +220,7 @@ if ($act == 'update') {
     // 所有权：无 UploadAll 仅能编辑自己的附件
     at8_media_library_check_owner($u);
     if (isset($_POST['logid'])) {
-        $u->LogID = max(0, (int) $_POST['logid']);
+        $u->LogID = at8_media_library_validate_logid((int) $_POST['logid']);
     }
     at8_media_library_update_meta($u, $_POST);
     $u->Save();
@@ -269,8 +294,7 @@ if ($act == 'bulk') {
 
     if ($op == 'bind') {
         at8_media_library_require_right('UploadPst'); // 官方权限项：上传（关联属写操作）
-        $logid = (int) GetVars('logid', 'POST');
-        $logid = max(0, $logid);
+        $logid = at8_media_library_validate_logid((int) GetVars('logid', 'POST'));
         $done = 0;
         $skipped = 0;
         // 一次 IN 查询取回全部附件对象，避免逐条 N+1 查询
