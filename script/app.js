@@ -255,6 +255,7 @@
 	function thumbHtml(item) {
 		let badge = '';
 		if (!item.exists) badge = '<span class="mlx-badge mlx-badge-missing">文件缺失</span>';
+		else if (item.local_missing) badge = '<span class="mlx-badge">本地无文件 · 可能已转存云端</span>';
 		else if (item.kind === 'image') badge = '<span class="mlx-badge">' + esc(item.kind_label) + (item.width ? ' ' + item.width + '×' + item.height : '') + '</span>';
 		else badge = '<span class="mlx-badge">' + esc(item.kind_label) + '</span>';
 
@@ -393,7 +394,7 @@
 			'<tr><td>大小</td><td>' + esc(item.size_text) + (item.width ? ' · ' + item.width + '×' + item.height + ' px' : '') + '</td></tr>' +
 			'<tr><td>上传时间</td><td>' + esc(item.date_text) + '</td></tr>' +
 			'<tr><td>上传者</td><td>' + esc(item.author) + '</td></tr>' +
-			'<tr><td>文件状态</td><td>' + (item.exists ? '正常' : '<span class="mlx-missing">文件缺失（记录存在但文件已被删除）</span>') + '</td></tr>' +
+			'<tr><td>文件状态</td><td>' + (item.exists ? (item.local_missing ? '正常 · 本地无文件（可能已转存云端）' : '正常') : '<span class="mlx-missing">文件缺失（记录存在但文件已被删除）</span>') + '</td></tr>' +
 			'<tr><td>关联文章</td><td>' + (item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</td></tr>' +
 			'<tr><td>引用状态</td><td id="ml-dw-quote">' + (item.logid > 0 ? '检测中…' : '<span style="color:#b8860b">⚠️ 未引用（未关联文章）</span>') + '</td></tr>';
 
@@ -409,7 +410,7 @@
 			'<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-copymd">复制 Markdown</button>' +
 			'<a class="mlx-btn mlx-btn-sm" href="' + esc(item.url) + '" target="_blank">新窗口打开</a>' +
 			(canEdit ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-replace">替换文件</button>' : '') +
-			(canEdit ? '<button type="button" class="mlx-btn mlx-btn-sm mlx-btn-danger" id="ml-dw-del">删除</button>' : '') +
+			(ML.canDelete ? '<button type="button" class="mlx-btn mlx-btn-sm mlx-btn-danger" id="ml-dw-del">删除</button>' : '') +
 			'</div>' +
 			(canEdit ?
 			'<div class="mlx-dw-field"><label>标题</label><input type="text" class="mlx-input" id="ml-dw-title" value="' + esc(item.title) + '"></div>' +
@@ -810,6 +811,7 @@
 			renderGrid();
 		});
 		$('ml-btn-bulkbind').addEventListener('click', showBindModal);
+		if (!ML.canDelete) $('ml-btn-bulkdel').style.display = 'none';
 		$('ml-btn-bulkdel').addEventListener('click', function () {
 			let n = 0;
 			for (let k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
@@ -836,6 +838,7 @@
 				apiPost(fd, function (d) {
 					done += (d && d.done) || 0;
 					skipped += (d && d.skipped) || 0;
+					failed += (d && d.failed) || 0;
 					next();
 				}, function () {
 					// 单批失败不中断后续批次，最后汇总提示
