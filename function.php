@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.5.1');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.0');
 }
 
 /**
@@ -116,14 +116,39 @@ function at8_media_library_check_login()
 }
 
 /**
- * 附件写操作权限
+ * 是否可管理全部附件（官方口径：UploadAll；root 兜底）
+ * UploadAll 仅用于「操作/查看其他人的附件」，普通上传/删除走 UploadPst / UploadDel
  */
-function at8_media_library_check_upload_rights()
+function at8_media_library_can_all()
 {
     global $zbp;
-    if (!$zbp->CheckRights('UploadAll') && !$zbp->CheckRights('root')) {
-        at8_media_library_error('没有操作附件的权限', 403);
+    return $zbp->CheckRights('UploadAll') || $zbp->CheckRights('root');
+}
+
+/**
+ * 通用权限校验（对齐官方 PostUpload/DelUpload 的权限项）
+ * 老版本无对应权限项时退回 UploadAll 口径
+ */
+function at8_media_library_require_right($right)
+{
+    global $zbp;
+    $ok = isset($GLOBALS['actions'][$right]) ? $zbp->CheckRights($right) : at8_media_library_can_all();
+    if (!$ok) {
+        at8_media_library_error('没有该操作的权限（' . $right . '）', 403);
     }
+}
+
+/**
+ * 附件读操作范围（对齐官方 Admin_UploadMng：无 UploadAll 仅见自己的附件）
+ * 服务端强制注入查询条件，不信任前端传入的任何作者参数
+ */
+function at8_media_library_scope_where()
+{
+    global $zbp;
+    if (at8_media_library_can_all()) {
+        return array();
+    }
+    return array(array('=', 'ul_AuthorID', (int) $zbp->user->ID));
 }
 
 /**
@@ -469,14 +494,23 @@ function at8_media_library_upload_row($u)
         $row['alt'] = (string) @$u->Metas->media_alt;
     }
 
-    // 文件是否真实存在（路径由 Upload 对象推导，兼容系统上传的存储格式）
+    // 文件存在性（云存储兼容口径，不能以「本地文件是否存在」判断附件丢失）：
+    // - 系统标准记录：URL 由系统/云存储 hook 提供，一律视为可访问（exists=1）；
+    //   本地文件缺失时仅标记 local_missing=1，前端显示中性提示（可能已转存云端）
+    // - 旧格式记录（历史前缀存储）：不经官方存储流程，云插件不会接管，本地缺失即为真缺失
     $file = at8_media_library_disk_path($u);
-    $row['exists'] = ($file !== '') ? 1 : 0;
+    if (at8_media_library_is_standard_name($u->Name)) {
+        $row['exists'] = 1;
+        $row['local_missing'] = ($file === '') ? 1 : 0;
+    } else {
+        $row['exists'] = ($file !== '') ? 1 : 0;
+        $row['local_missing'] = 0;
+    }
 
     // 图片尺寸（请求内静态缓存，key 含 mtime 防替换后读到旧尺寸；避免同请求内重复读盘）
     $row['width'] = 0;
     $row['height'] = 0;
-    if ($row['kind'] == 'image' && $row['exists']) {
+    if ($row['kind'] == 'image' && $file !== '') {
         static $dimCache = array();
         $ck = $file . '|' . (string) @filemtime($file);
         if (!isset($dimCache[$ck])) {
@@ -667,14 +701,16 @@ function at8_media_library_build_where($p)
 
 /**
  * 扫描附件表做统计（只读取必要列，PHP 侧聚合）
+ * $scoped=true 时仅统计当前用户自己的附件（无 UploadAll 权限的数据范围）
  */
-function at8_media_library_scan()
+function at8_media_library_scan($scoped = false)
 {
     global $zbp;
+    $where = $scoped ? at8_media_library_scope_where() : array();
     $sql = $zbp->db->sql->Select(
         $zbp->table['Upload'],
         array('ul_ID', 'ul_LogID', 'ul_AuthorID', 'ul_PostTime', 'ul_Size', 'ul_MimeType', 'ul_Name'),
-        null,
+        $where,
         null,
         null
     );
@@ -1011,6 +1047,10 @@ function at8_media_library_stats_flush()
 {
     global $zbp;
     at8_media_library_cache_del('stats');
+    at8_media_library_cache_del('stats_all');
+    if (isset($zbp->user) && is_object($zbp->user) && (int) $zbp->user->ID > 0) {
+        at8_media_library_cache_del('stats_u' . (int) $zbp->user->ID);
+    }
     if (isset($zbp->cache) && is_object($zbp->cache)) {
         $zbp->cache->at8_media_library_stats_time = 0;
         if (method_exists($zbp, 'SaveCache')) {
@@ -1019,18 +1059,28 @@ function at8_media_library_stats_flush()
     }
 }
 
+/**
+ * 汇总统计（按数据范围分键缓存：UploadAll 用户看全站，普通用户仅看自己的附件）
+ */
 function at8_media_library_stats()
 {
     global $zbp;
 
+    $scoped = !at8_media_library_can_all();
+    $key = $scoped ? 'stats_u' . (int) $zbp->user->ID : 'stats_all';
+
     // 读缓存（优先 Redis / APCu / Opcache 文件缓存）
-    $cached = at8_media_library_cache_get('stats');
+    $cached = at8_media_library_cache_get($key);
     if (is_array($cached) && isset($cached['total'])) {
         return at8_media_library_hook('at8_media_library_Stats', $cached);
     }
 
-    // 兼容旧缓存：系统 cache 存储的 5 分钟缓存
-    if (isset($zbp->cache) && is_object($zbp->cache)) {
+    // 兼容旧缓存：系统 cache 存储的 5 分钟缓存（仅全站口径可用）
+    $legacyOk = true;
+    if ($scoped) {
+        $legacyOk = false; // 旧缓存是全站数据，不能泄露给无 UploadAll 用户
+    }
+    if ($legacyOk && isset($zbp->cache) && is_object($zbp->cache)) {
         $ts = (int) $zbp->cache->at8_media_library_stats_time;
         $raw = (string) $zbp->cache->at8_media_library_stats;
         if ($raw !== '' && $ts > 0 && (time() - $ts) < at8_media_library_stats_ttl()) {
@@ -1041,11 +1091,11 @@ function at8_media_library_stats()
         }
     }
 
-    $data = at8_media_library_stats_compute();
+    $data = at8_media_library_stats_compute($scoped);
 
     // 写缓存（新缓存层 + 旧系统 cache 双写，保证任意环境下都有缓存生效）
-    at8_media_library_cache_set('stats', $data, at8_media_library_stats_ttl());
-    if (isset($zbp->cache) && is_object($zbp->cache)) {
+    at8_media_library_cache_set($key, $data, at8_media_library_stats_ttl());
+    if (!$scoped && isset($zbp->cache) && is_object($zbp->cache)) {
         $zbp->cache->at8_media_library_stats = (string) json_encode($data);
         $zbp->cache->at8_media_library_stats_time = time();
         if (method_exists($zbp, 'SaveCache')) {
@@ -1056,13 +1106,14 @@ function at8_media_library_stats()
     return at8_media_library_hook('at8_media_library_Stats', $data);
 }
 
-function at8_media_library_stats_compute()
+function at8_media_library_stats_compute($scoped = false)
 {
     global $zbp;
     $t = $zbp->table['Upload'];
+    $scope = $scoped ? at8_media_library_scope_where() : array();
 
     // 先取总数，附件量极大时改用聚合查询，避免整表扫描
-    $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), null);
+    $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), $scope);
     $res = $zbp->db->Query($sql);
     $total = 0;
     if (count($res) > 0) {
@@ -1071,17 +1122,17 @@ function at8_media_library_stats_compute()
     }
 
     if ($total > 50000) {
-        $sql = $zbp->db->sql->Count($t, array('SUM', 'ul_Size'), null);
+        $sql = $zbp->db->sql->Count($t, array('SUM', 'ul_Size'), $scope);
         $res = $zbp->db->Query($sql);
         $vals = count($res) > 0 ? array_values($res[0]) : array(0);
         $totalsize = (int) $vals[0];
 
-        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), at8_media_library_kind_where('image'));
+        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), array_merge($scope, at8_media_library_kind_where('image')));
         $res = $zbp->db->Query($sql);
         $vals = count($res) > 0 ? array_values($res[0]) : array(0);
         $images = (int) $vals[0];
 
-        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), array(array('=', 'ul_LogID', 0)));
+        $sql = $zbp->db->sql->Count($t, array('COUNT', '*'), array_merge($scope, array(array('=', 'ul_LogID', 0))));
         $res = $zbp->db->Query($sql);
         $vals = count($res) > 0 ? array_values($res[0]) : array(0);
         $unused = (int) $vals[0];
@@ -1099,7 +1150,7 @@ function at8_media_library_stats_compute()
         );
     }
 
-    $scan = at8_media_library_scan();
+    $scan = at8_media_library_scan($scoped);
 
     $monthList = array();
     $i = 0;
@@ -1148,6 +1199,11 @@ function at8_media_library_list($p)
     $order = isset($orderMap[$orderby]) ? $orderMap[$orderby] : array('ul_PostTime' => 'DESC');
 
     $where = at8_media_library_build_where($p);
+    // 服务端强制数据范围：无 UploadAll 仅见自己的附件（对齐官方 Admin_UploadMng，不信任前端参数）
+    $scope = at8_media_library_scope_where();
+    if (count($scope) > 0) {
+        $where = array_merge($scope, $where);
+    }
     // 对外接口：其他插件可追加 / 修改查询条件（如自定义筛选维度）
     $where = at8_media_library_hook('at8_media_library_ListWhere', $where, $p);
 
@@ -1532,7 +1588,8 @@ function at8_media_library_detect_mime($file, $ext)
 function at8_media_library_save_one($fileInfo, $logid)
 {
     global $zbp;
-    at8_media_library_check_upload_rights();
+    // 官方权限项：上传 = UploadPst（对齐官方 PostUpload）
+    at8_media_library_require_right('UploadPst');
 
     $err = isset($fileInfo['error']) ? (int) $fileInfo['error'] : 4;
     if ($err !== 0) {
@@ -1590,6 +1647,9 @@ function at8_media_library_save_one($fileInfo, $logid)
 
     // SaveFile 无论成败均返回 true（系统行为），落盘结果必须实际验证。
     // Windows 下磁盘名为本地字符集转码结果，需按同一规则换算后检查。
+    // 兼容对象存储插件（fui_oss 等）：SaveFile hook 被接管时文件可能不落本地、由请求结束统一上传云端，
+    // 此时本地无文件不算失败——记录数据改从临时文件读取。
+    $storageHooked = !empty($GLOBALS['hooks']['Filter_Plugin_Upload_SaveFile']);
     $diskName = $u->Name;
     if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
         $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $u->Name);
@@ -1599,7 +1659,12 @@ function at8_media_library_save_one($fileInfo, $logid)
     }
     $savedPath = $zbp->usersdir . $u->Dir . $diskName;
     if (!is_file($savedPath)) {
-        at8_media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
+        if (!$storageHooked) {
+            at8_media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
+        }
+        // 云存储接管：本地无落盘属预期行为，大小/MIME 从临时文件读取
+        $savedPath = $fileInfo['tmp_name'];
+        at8_media_library_audit('上传 #' . $u->Name . ' 本地未落盘（存储插件接管），按云端流程继续');
     }
     @chmod($savedPath, 0644);
 
@@ -1611,7 +1676,84 @@ function at8_media_library_save_one($fileInfo, $logid)
     $u->LogID = max(0, (int) $logid);
     $u->Save();
 
+    // 官方流程：更新用户附件数 + 触发官方上传成功 hook（对齐官方 PostUpload）
+    if (function_exists('CountMemberArray')) {
+        CountMemberArray(array((int) $zbp->user->ID), array(0, 0, 0, +1));
+    }
+    if (isset($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed']) && is_array($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed'])) {
+        foreach ($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed'] as $fpname => &$fpsignal) {
+            $fpname($u);
+        }
+    }
+
     return $u;
+}
+
+/**
+ * 按官方流程删除附件（对齐官方 DelUpload：Del + CountMemberArray(-1) + DelFile，此处加固为先删文件验证、再删记录）
+ * - 标准记录：走系统 DelFile()（云存储插件经 Filter_Plugin_Upload_DelFile hook 接管，返回值可信）
+ * - 旧格式记录：FullFile 指向不正确，按兼容路径删
+ * - 本地文件存在但删除失败 → 返回 false，不删数据库记录（避免「记录没了文件还在」）
+ * 返回 bool：true=删除成功
+ */
+function at8_media_library_delete_upload($u)
+{
+    $standard = at8_media_library_is_standard_name($u->Name);
+
+    // 官方 DelFile（云存储 hook 接管时返回 hook 的返回值）
+    $delRet = $u->DelFile();
+
+    // 本地残留校验：上传同款 Windows 字符集转码路径，DelFile 未覆盖到时兜底 unlink
+    $local = '';
+    if ($standard) {
+        global $zbp;
+        $diskName = $u->Name;
+        if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
+            $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $u->Name);
+            if (is_string($conv) && $conv !== '') {
+                $diskName = $conv;
+            }
+        }
+        $p = $zbp->usersdir . $u->Dir . $diskName;
+        if (is_file($p)) {
+            $local = $p;
+        }
+    } else {
+        $local = at8_media_library_disk_path($u);
+    }
+    if ($local !== '' && is_file($local)) {
+        if (!@unlink($local) || is_file($local)) {
+            return false; // 文件删除失败，保留数据库记录
+        }
+    }
+    if ($delRet === false) {
+        return false; // 存储插件 hook 报告删除失败（如云端删除失败）
+    }
+
+    $u->Del();
+    // 官方流程：同步用户附件数（对齐官方 DelUpload）
+    if (function_exists('CountMemberArray')) {
+        CountMemberArray(array((int) $u->AuthorID), array(0, 0, 0, -1));
+    }
+    at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
+    // 对外接口：删除成功事件
+    at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
+    return true;
+}
+
+/**
+ * 附件所有权校验：无 UploadAll 权限只能操作自己的附件
+ * $strict=true 时无权限直接返回 JSON 错误；false 时返回 bool（批量操作跳过用）
+ */
+function at8_media_library_check_owner($u, $strict = true)
+{
+    if (at8_media_library_can_all() || (int) $u->AuthorID === (int) $GLOBALS['zbp']->user->ID) {
+        return true;
+    }
+    if ($strict) {
+        at8_media_library_error('只能操作自己的附件', 403);
+    }
+    return false;
 }
 
 /**
