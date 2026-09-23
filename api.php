@@ -59,13 +59,15 @@ if ($act == 'quotecheck') {
     if ($u->ID == 0) {
         at8_media_library_error('附件不存在');
     }
+    // 数据范围：无 UploadAll 仅能检测自己的附件
+    at8_media_library_check_owner($u);
     at8_media_library_ok(at8_media_library_quote_state($u));
 }
 
 // 上传（支持多文件、拖拽）
 if ($act == 'upload') {
     at8_media_library_check_csrf();
-    at8_media_library_check_upload_rights();
+    at8_media_library_require_right('UploadPst'); // 官方权限项：上传
     $logid = (int) GetVars('logid', 'POST');
     $files = at8_media_library_normalize_files('files');
     if (count($files) == 0) {
@@ -95,12 +97,14 @@ if ($act == 'upload') {
 // 替换文件（保留附件记录与 URL 路径不变）
 if ($act == 'replace') {
     at8_media_library_check_csrf();
-    at8_media_library_check_upload_rights();
+    at8_media_library_require_right('UploadPst'); // 官方权限项：上传（替换属写操作）
     $id = (int) GetVars('id', 'POST');
     $u = $zbp->GetUploadByID($id);
     if ($u->ID == 0) {
         at8_media_library_error('附件不存在');
     }
+    // 所有权：无 UploadAll 仅能替换自己的附件
+    at8_media_library_check_owner($u);
     $files = at8_media_library_normalize_files('file');
     if (count($files) != 1) {
         at8_media_library_error('请选择一个替换文件');
@@ -133,21 +137,47 @@ if ($act == 'replace') {
     if ($origExt !== '' && $ext !== $origExt) {
         at8_media_library_error('替换文件类型（.' . $ext . '）需与原附件（.' . $origExt . '）一致；如需其他类型请删除后重新上传');
     }
-    // 目标文件必须真实存在且落在附件目录内（防止记录被篡改后越权覆盖文件）
-    $target = at8_media_library_disk_path($u);
-    if ($target === '') {
-        at8_media_library_error('未找到原附件文件，无法替换（可删除后重新上传）');
-    }
-    if (!@move_uploaded_file($f['tmp_name'], $target)) {
-        at8_media_library_error('替换失败，请检查目录写入权限');
-    }
-    @chmod($target, 0644);
     // 注意：不更新 PostTime —— Dir/Url 均由 PostTime 推导，更新会导致附件 URL 变化
     // 且 FullFile 指向新目录而文件仍在旧目录（跨月替换必现「文件缺失」）
-    $u->SourceName = $orig;
-    $u->Size = (int) @filesize($target);
-    $u->MimeType = at8_media_library_detect_mime($target, $ext);
-    $u->Save();
+    if (at8_media_library_is_standard_name($u->Name)) {
+        // 系统标准记录：走官方存储流程（DelFile 触发云存储删除 hook，SaveFile 触发云存储上传 hook），
+        // 确保对象存储同步更新，云端与本站内容一致
+        $target = at8_media_library_disk_path($u);
+        if ($target !== '' && !is_writable(dirname($target))) {
+            at8_media_library_error('替换失败，请检查目录写入权限');
+        }
+        $delRet = $u->DelFile();
+        if ($delRet === false) {
+            at8_media_library_error('原文件删除失败（存储插件报告），已中止替换');
+        }
+        if (!$u->SaveFile($f['tmp_name'])) {
+            at8_media_library_error('替换失败：站点「允许上传的文件类型」设置与该扩展名冲突');
+        }
+        $storageHooked = !empty($GLOBALS['hooks']['Filter_Plugin_Upload_SaveFile']);
+        $newPath = at8_media_library_disk_path($u);
+        if ($newPath === '' && !$storageHooked) {
+            at8_media_library_error('替换失败，请检查目录写入权限');
+        }
+        $statFile = ($newPath !== '') ? $newPath : $f['tmp_name'];
+        $u->SourceName = $orig;
+        $u->Size = (int) @filesize($statFile);
+        $u->MimeType = at8_media_library_detect_mime($statFile, $ext);
+        $u->Save();
+    } else {
+        // 旧格式记录（历史前缀存储）：不经官方存储流程、云插件不会接管，本地直替
+        $target = at8_media_library_disk_path($u);
+        if ($target === '') {
+            at8_media_library_error('未找到原附件文件，无法替换（可删除后重新上传）');
+        }
+        if (!@move_uploaded_file($f['tmp_name'], $target)) {
+            at8_media_library_error('替换失败，请检查目录写入权限');
+        }
+        @chmod($target, 0644);
+        $u->SourceName = $orig;
+        $u->Size = (int) @filesize($target);
+        $u->MimeType = at8_media_library_detect_mime($target, $ext);
+        $u->Save();
+    }
     at8_media_library_stats_flush();
     at8_media_library_audit('替换附件 #' . $u->ID . ' ' . $u->Name . ' -> ' . $orig);
     at8_media_library_ok(at8_media_library_upload_row($u));
@@ -156,12 +186,14 @@ if ($act == 'replace') {
 // 更新附件信息（标题 / Alt / 说明 / 关联文章）
 if ($act == 'update') {
     at8_media_library_check_csrf();
-    at8_media_library_check_upload_rights();
+    at8_media_library_require_right('UploadPst'); // 官方权限项：上传（信息编辑属写操作）
     $id = (int) GetVars('id', 'POST');
     $u = $zbp->GetUploadByID($id);
     if ($u->ID == 0) {
         at8_media_library_error('附件不存在');
     }
+    // 所有权：无 UploadAll 仅能编辑自己的附件
+    at8_media_library_check_owner($u);
     if (isset($_POST['logid'])) {
         $u->LogID = max(0, (int) $_POST['logid']);
     }
@@ -175,7 +207,7 @@ if ($act == 'update') {
 // 批量操作
 if ($act == 'bulk') {
     at8_media_library_check_csrf();
-    at8_media_library_check_upload_rights();
+    // 具体权限项在 op 分支内细分（delete=UploadDel / bind=UploadPst）
     $op = GetVars('op', 'POST');
     $ids = isset($_POST['ids']) ? $_POST['ids'] : '';
     $idArr = array();
@@ -195,7 +227,10 @@ if ($act == 'bulk') {
 
     if ($op == 'delete') {
         @set_time_limit(0); // 批量删文件可能较慢，避免执行超时中断
+        at8_media_library_require_right('UploadDel'); // 官方权限项：删除
         $done = 0;
+        $failed = 0;
+        $skipped = 0;
         // 一次 IN 查询取回全部附件对象，避免逐条 N+1 查询
         $sql = $zbp->db->sql->Select(
             $zbp->table['Upload'],
@@ -209,32 +244,35 @@ if ($act == 'bulk') {
             $u = new Upload();
             $u->LoadInfoByAssoc($r);
             if ((int) $u->ID <= 0) {
+                $skipped++;
                 continue;
             }
-            // 标准记录走系统 DelFile()（兼容云存储接管插件）；历史前缀记录 FullFile 指向不正确，按兼容路径删
-            if (at8_media_library_is_standard_name($u->Name)) {
-                $u->DelFile();
-            } else {
-                $disk = at8_media_library_disk_path($u);
-                if ($disk !== '') {
-                    @unlink($disk);
-                }
+            // 无 UploadAll 只能删自己的附件；他人附件计为跳过
+            if (!at8_media_library_check_owner($u, false)) {
+                $skipped++;
+                continue;
             }
-            at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
-            $u->Del();
-            // 对外接口：删除成功事件（批量分支）
-            at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
-            $done++;
+            // 官方流程删除：文件（含云存储 hook）删除验证成功后才删记录、同步用户附件数
+            if (at8_media_library_delete_upload($u)) {
+                $done++;
+            } else {
+                $failed++;
+            }
         }
-        $skip = count($idArr) - $done;
+        $skipped += count($idArr) - $done - $failed - $skipped;
+        if ($skipped < 0) {
+            $skipped = 0;
+        }
         at8_media_library_stats_flush();
-        at8_media_library_ok(array('done' => $done, 'skipped' => $skip));
+        at8_media_library_ok(array('done' => $done, 'failed' => $failed, 'skipped' => $skipped));
     }
 
     if ($op == 'bind') {
+        at8_media_library_require_right('UploadPst'); // 官方权限项：上传（关联属写操作）
         $logid = (int) GetVars('logid', 'POST');
         $logid = max(0, $logid);
         $done = 0;
+        $skipped = 0;
         // 一次 IN 查询取回全部附件对象，避免逐条 N+1 查询
         $sql = $zbp->db->sql->Select(
             $zbp->table['Upload'],
@@ -248,6 +286,12 @@ if ($act == 'bulk') {
             $u = new Upload();
             $u->LoadInfoByAssoc($r);
             if ((int) $u->ID <= 0) {
+                $skipped++;
+                continue;
+            }
+            // 无 UploadAll 只能关联自己的附件；他人附件计为跳过
+            if (!at8_media_library_check_owner($u, false)) {
+                $skipped++;
                 continue;
             }
             $u->LogID = $logid;
@@ -255,8 +299,8 @@ if ($act == 'bulk') {
             $done++;
         }
         at8_media_library_stats_flush();
-        at8_media_library_audit('批量关联 ' . $done . ' 个附件 -> 文章 #' . $logid);
-        at8_media_library_ok(array('done' => $done));
+        at8_media_library_audit('批量关联 ' . $done . ' 个附件 -> 文章 #' . $logid . '，跳过 ' . $skipped);
+        at8_media_library_ok(array('done' => $done, 'skipped' => $skipped));
     }
 
     at8_media_library_error('未知操作');
@@ -265,25 +309,18 @@ if ($act == 'bulk') {
 // 删除单个
 if ($act == 'delete') {
     at8_media_library_check_csrf();
-    at8_media_library_check_upload_rights();
+    at8_media_library_require_right('UploadDel'); // 官方权限项：删除
     $id = (int) GetVars('id', 'POST');
     $u = $zbp->GetUploadByID($id);
     if ($u->ID == 0) {
         at8_media_library_error('附件不存在');
     }
-    // 标准记录走系统 DelFile()（兼容云存储接管插件）；历史前缀记录 FullFile 指向不正确，按兼容路径删
-    if (at8_media_library_is_standard_name($u->Name)) {
-        $u->DelFile();
-    } else {
-        $disk = at8_media_library_disk_path($u);
-        if ($disk !== '') {
-            @unlink($disk);
-        }
+    // 所有权：无 UploadAll 仅能删除自己的附件
+    at8_media_library_check_owner($u);
+    // 官方流程删除：文件（含云存储 hook）删除验证成功后才删记录、同步用户附件数
+    if (!at8_media_library_delete_upload($u)) {
+        at8_media_library_error('删除失败：文件无法删除（目录权限或存储插件报告失败），记录已保留');
     }
-    at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
-    $u->Del();
-    // 对外接口：删除成功事件（单个分支）
-    at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
     at8_media_library_stats_flush();
     at8_media_library_ok(array('id' => $id));
 }
