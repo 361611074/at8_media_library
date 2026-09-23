@@ -88,6 +88,10 @@ function myapp_Thumb(&$url, $upload) {
 
 ## 更新日志
 
+### 1.6.3
+
+- 规范：失败响应的 HTTP 状态码与 JSON `code` 对齐（`code` 在 400~599 时同步设置 HTTP 状态码），参数校验失败 / 未授权 / 方法不允许不再一律返回 `200 OK`；响应体结构不变，前端零改动
+
 ### 1.6.2
 
 - 安全：写操作（`upload` / `replace` / `update` / `bulk` / `delete`）强制 POST，非 POST 返回 `405`

@@ -345,7 +345,7 @@ if ($act == 'bulk') {
         at8_media_library_ok(array('done' => $done, 'skipped' => $skipped));
     }
 
-    at8_media_library_error('未知操作');
+    at8_media_library_error('未知操作', 400);
 }
 
 // 删除单个

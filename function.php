@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.2');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.3');
 }
 
 /**
@@ -75,6 +75,12 @@ function at8_media_library_json($arr)
 
 function at8_media_library_error($msg, $code = 1)
 {
+    // 业务 code 落在标准 HTTP 状态区间（400~599）时，同步设置为 HTTP 状态码，
+    // 使 WAF / 访问日志 / 监控能按标准语义识别失败请求；响应体仍保留 code / success 供前端判断。
+    // headers_sent() 守卫：已知头信息已发出时静默跳过，不影响响应体
+    if (!headers_sent() && is_int($code) && $code >= 400 && $code < 600) {
+        http_response_code($code);
+    }
     at8_media_library_json(array('success' => false, 'code' => $code, 'msg' => $msg));
 }
 
