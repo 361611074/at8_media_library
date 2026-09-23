@@ -85,5 +85,5 @@
 
 ## 8. 发布物
 
-- `at8_media_library_1.6.2_20260923.zba`（70.1 KB，11 文件；已剔除 screenshots / README / CHANGELOG / RELEASE_CHECKLIST / cache）
+- `at8_media_library_1.6.3_20260923.zba`（70.3 KB，11 文件；已剔除 screenshots / README / CHANGELOG / RELEASE_CHECKLIST / cache / `.git`）
 - GitHub：https://github.com/361611074/at8_media_library
