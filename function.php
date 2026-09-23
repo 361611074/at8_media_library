@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.0');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.1');
 }
 
 /**
@@ -1754,6 +1754,28 @@ function at8_media_library_check_owner($u, $strict = true)
         at8_media_library_error('只能操作自己的附件', 403);
     }
     return false;
+}
+
+/**
+ * 关联文章校验：文章必须存在，且（属于自己 或 拥有 UploadAll）
+ * 防止通过「关联附件 + 引用检测 / 标题回显」探测他人草稿、审核中文章的标题与正文特征
+ * 返回合法的 logid（0 = 不关联）
+ */
+function at8_media_library_validate_logid($logid)
+{
+    global $zbp;
+    $logid = max(0, (int) $logid);
+    if ($logid == 0) {
+        return 0;
+    }
+    $post = $zbp->GetPostByID($logid);
+    if ($post->ID == 0 || (int) $post->ID !== $logid) {
+        at8_media_library_error('关联的文章不存在');
+    }
+    if (!at8_media_library_can_all() && (int) $post->AuthorID !== (int) $zbp->user->ID) {
+        at8_media_library_error('只能关联到自己的文章', 403);
+    }
+    return $logid;
 }
 
 /**
