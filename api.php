@@ -9,7 +9,25 @@ require_once dirname(__FILE__) . '/function.php';
 $zbp->Load();
 at8_media_library_check_login();
 
-$act = GetVars('act', 'REQUEST');
+// 动作取值：显式只读 POST / GET，不用 $_REQUEST（$_REQUEST 含 COOKIE，可能被外部注入 act）
+$act = '';
+if (isset($_POST['act']) && is_string($_POST['act'])) {
+    $act = $_POST['act'];
+} elseif (isset($_GET['act']) && is_string($_GET['act'])) {
+    $act = $_GET['act'];
+}
+
+// 允许的动作白名单（未列出一律拒绝，避免任何隐式分支）
+$readActs = array('list', 'stats', 'categories', 'posts', 'quotecheck');
+$writeActs = array('upload', 'replace', 'update', 'bulk', 'delete');
+if (!in_array($act, $readActs, true) && !in_array($act, $writeActs, true)) {
+    // 不回显原始输入，避免反射型内容进入响应与日志
+    at8_media_library_error('未知操作', 400);
+}
+// 写操作强制 POST：避免用 GET 触发状态变更，也避免 CSRF 校验被请求方法绕过
+if (in_array($act, $writeActs, true) && (!isset($_SERVER['REQUEST_METHOD']) || strtoupper($_SERVER['REQUEST_METHOD']) !== 'POST')) {
+    at8_media_library_error('该操作必须使用 POST 请求', 405);
+}
 
 // 列表
 if ($act == 'list') {
@@ -349,5 +367,5 @@ if ($act == 'delete') {
     at8_media_library_ok(array('id' => $id));
 }
 
-// JSON 输出不做 HTML 转义（避免前端展示出现实体字符双重转义），$act 仅原样回显且不参与任何 SQL / 文件操作
-at8_media_library_error('未知操作：' . (is_string($act) ? $act : ''));
+// 所有动作已在文件头经白名单分发，此处为防御性兜底（正常不可达）
+at8_media_library_error('未知操作', 400);

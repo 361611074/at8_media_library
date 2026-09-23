@@ -150,7 +150,7 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 	<button type="button" class="mlx-lb-btn mlx-lb-close" id="ml-lb-close">×</button>
 </div>
 
-<script>window.ML = <?php echo $ml_config_json; ?>;</script>
+<script>window.AT8ML = <?php echo $ml_config_json; ?>;</script>
 <script src="<?php echo $zbp->host; ?>zb_users/plugin/at8_media_library/script/app.js?v=<?php echo AT8_MEDIA_LIBRARY_VERSION; ?>"></script>
 <script>if (typeof ActiveLeftMenu == "function") { ActiveLeftMenu("nav_at8_media_library"); }</script>
 <?php

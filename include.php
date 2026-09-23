@@ -106,9 +106,19 @@ function at8_media_library_Updated()
     UpdatePlugin_at8_media_library();
 }
 
+/**
+ * 停用 / 卸载钩子：只清理运行时文件缓存目录（cache/），不删除任何配置与业务数据
+ *
+ * 【1.7.5 实机核实，勿改】官方 DisablePlugin() 内部会调用 UninstallPlugin_xxx()，
+ * 即「停用插件」也会进入本函数；真正的「删除应用」由 AppCentre/app_del.php 直接删目录，
+ * 不触发本函数。故本函数不得删除配置或附件数据，否则停用即造成用户数据丢失。
+ *
+ * 保留：插件配置（config）、全部附件记录（zbp_upload）、附件实体文件、
+ *      附件自定义信息（Metas / Intro）——重新启用后照常可用
+ */
 function UninstallPlugin_at8_media_library()
 {
-    // 清理运行时文件缓存目录（插件目录下 cache/），保留配置与附件数据，卸载不删附件文件
+    // 运行时文件缓存目录（插件目录下 cache/），可再生，停用时清理不影响任何用户数据
     $dir = dirname(__FILE__) . '/cache';
     if (is_dir($dir)) {
         // 两次 glob：* 不匹配 dotfile（如 .htaccess），.* 需剔除 . / ..

@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.1');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.2');
 }
 
 /**
@@ -44,9 +44,14 @@ function at8_media_library_hook($name, &$arg, $context = null)
 
 /**
  * 输出 JSON 并结束
+ * 响应结构：success(bool) + code(int, 0=成功) + msg + data
+ * success 为通用约定的布尔结果位；code / msg 为既有前端使用的字段，保持向后兼容
  */
 function at8_media_library_json($arr)
 {
+    if (!array_key_exists('success', $arr)) {
+        $arr['success'] = (isset($arr['code']) && (int) $arr['code'] === 0);
+    }
     // 对齐官方 ApiResponse() 的 @ob_clean() 思路：只清空缓冲内容、不删除任何缓冲层，
     // 保留 debug 插件等基于输出捕获的工具层；输出 JSON 后将内容逐层推送给客户端，
     // 收尾时缓冲层仍在但已空——debug 插件收尾 ob_end_clean() 有缓冲可删不会报 E_WARNING，
@@ -70,12 +75,12 @@ function at8_media_library_json($arr)
 
 function at8_media_library_error($msg, $code = 1)
 {
-    at8_media_library_json(array('code' => $code, 'msg' => $msg));
+    at8_media_library_json(array('success' => false, 'code' => $code, 'msg' => $msg));
 }
 
 function at8_media_library_ok($data = null)
 {
-    $arr = array('code' => 0, 'msg' => 'ok');
+    $arr = array('success' => true, 'code' => 0, 'msg' => 'ok');
     if ($data !== null) {
         $arr['data'] = $data;
     }
@@ -152,13 +157,15 @@ function at8_media_library_scope_where()
 }
 
 /**
- * CSRF 校验（POST 请求，复用官方 CheckCSRFTokenValid）
+ * CSRF 校验（写操作专用，复用官方 CheckCSRFTokenValid）
+ * 入口 api.php 已按动作强制 POST，此处再做一次纵深防御：非 POST 一律拒绝，
+ * 避免将来新增调用点忘记方法约束时「静默跳过校验」。
  */
 function at8_media_library_check_csrf()
 {
     global $zbp;
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        return;
+    if (!isset($_SERVER['REQUEST_METHOD']) || strtoupper($_SERVER['REQUEST_METHOD']) !== 'POST') {
+        at8_media_library_error('该操作必须使用 POST 请求', 405);
     }
     // 官方校验函数失败时返回 JSON 而非系统 HTML 错误页
     $ok = function_exists('CheckCSRFTokenValid') && CheckCSRFTokenValid('csrfToken', array('post'));

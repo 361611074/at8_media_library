@@ -1,3 +1,6 @@
 screenshots
 README.md
+CHANGELOG.md
+RELEASE_CHECKLIST.md
+zbignore.txt
 cache

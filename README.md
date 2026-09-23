@@ -43,6 +43,7 @@
 ## 兼容性
 
 - 适用于 Z-BlogPHP 1.7.0 及以上版本。
+- 需要 PHP 7.0 及以上（缓存层使用 `Throwable` 捕获异常；`plugin.xml` 已声明 `<phpver>7.0</phpver>`）。
 - 支持 MySQL、SQLite、PostgreSQL 三种数据库。
 - 数据查询全部使用系统自带的 SQL 构造器，不直接拼接 SQL 语句，不创建数据表，不修改系统文件。
 
@@ -86,6 +87,16 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.6.2
+
+- 安全：写操作（`upload` / `replace` / `update` / `bulk` / `delete`）强制 POST，非 POST 返回 `405`
+- 安全：`act` 不再读 `$_REQUEST`（含 COOKIE），改为显式「POST 优先 → GET 兜底」，并按只读 / 写操作两张白名单分发，未列出一律 `400`；未知动作不再回显原始输入
+- 安全：CSRF 校验非 POST 不再静默跳过，改为直接拒绝（防新增调用点漏校验）
+- 规范：JSON 响应新增 `success` 布尔字段（`{success, code, msg, data}`），`code` / `msg` 保持不变，前端零改动
+- 规范：JS 全局命名空间 `window.ML` → `window.AT8ML`，对齐插件唯一前缀
+- 规范：核实 1.7.5 停用流程后会触发卸载钩子，`UninstallPlugin_*` 仅清理可再生缓存目录，不再触碰配置与附件数据
+- 物料：新增 `LICENSE` / `CHANGELOG.md` / `RELEASE_CHECKLIST.md`；`plugin.xml` 声明 `<phpver>7.0</phpver>`
 
 ### 1.6.1
 

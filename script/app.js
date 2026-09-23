@@ -9,7 +9,7 @@
 	let state = {
 		view: 'grid',
 		page: 1,
-		perpage: ML.perpage || 48,
+		perpage: AT8ML.perpage || 48,
 		q: '',
 		kind: '',
 		cateid: '',
@@ -99,7 +99,7 @@
 			}
 		}
 		let xhr = new XMLHttpRequest();
-		xhr.open('GET', ML.api + '?' + qs.join('&'), true);
+		xhr.open('GET', AT8ML.api + '?' + qs.join('&'), true);
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState !== 4) return;
 			handleJson(xhr, cb);
@@ -108,9 +108,9 @@
 	}
 
 	function apiPost(formData, cb, onFail) {
-		formData.append('csrfToken', ML.csrfToken || '');
+		formData.append('csrfToken', AT8ML.csrfToken || '');
 		let xhr = new XMLHttpRequest();
-		xhr.open('POST', ML.api, true);
+		xhr.open('POST', AT8ML.api, true);
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState !== 4) return;
 			handleJson(xhr, cb, onFail);
@@ -387,7 +387,7 @@
 			preview = '<div class="mlx-dw-preview"><div class="mlx-fileicon"><div class="mlx-icon">' + esc(kindIconText(item.kind, item.name)) + '</div>' + esc(item.kind_label) + '</div></div>';
 		}
 
-		let canEdit = ML.canUpload;
+		let canEdit = AT8ML.canUpload;
 		let infoRows =
 			'<tr><td>URL</td><td>' + esc(item.url) + '</td></tr>' +
 			'<tr><td>类型</td><td>' + esc(item.kind_label) + ' / ' + esc(item.mime || '-') + '</td></tr>' +
@@ -410,7 +410,7 @@
 			'<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-copymd">复制 Markdown</button>' +
 			'<a class="mlx-btn mlx-btn-sm" href="' + esc(item.url) + '" target="_blank">新窗口打开</a>' +
 			(canEdit ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-replace">替换文件</button>' : '') +
-			(ML.canDelete ? '<button type="button" class="mlx-btn mlx-btn-sm mlx-btn-danger" id="ml-dw-del">删除</button>' : '') +
+			(AT8ML.canDelete ? '<button type="button" class="mlx-btn mlx-btn-sm mlx-btn-danger" id="ml-dw-del">删除</button>' : '') +
 			'</div>' +
 			(canEdit ?
 			'<div class="mlx-dw-field"><label>标题</label><input type="text" class="mlx-input" id="ml-dw-title" value="' + esc(item.title) + '"></div>' +
@@ -600,7 +600,7 @@
 	}
 
 	function uploadFiles(files) {
-		if (!ML.canUpload) { toast('没有上传权限', true); return; }
+		if (!AT8ML.canUpload) { toast('没有上传权限', true); return; }
 		if (!files || !files.length) return;
 		let logid = $('ml-upload-logid').value || '0';
 
@@ -619,12 +619,12 @@
 			let row = addUploadRow(f.name);
 			let fd = new FormData();
 			fd.append('act', 'upload');
-			fd.append('csrfToken', ML.csrfToken || '');
+			fd.append('csrfToken', AT8ML.csrfToken || '');
 			fd.append('logid', logid);
 			fd.append('files', f, f.name);
 
 			let xhr = new XMLHttpRequest();
-			xhr.open('POST', ML.api, true);
+			xhr.open('POST', AT8ML.api, true);
 			xhr.upload.onprogress = function (e) {
 				if (e.lengthComputable) {
 					let pct = Math.round(e.loaded / e.total * 100);
@@ -811,7 +811,7 @@
 			renderGrid();
 		});
 		$('ml-btn-bulkbind').addEventListener('click', showBindModal);
-		if (!ML.canDelete) $('ml-btn-bulkdel').style.display = 'none';
+		if (!AT8ML.canDelete) $('ml-btn-bulkdel').style.display = 'none';
 		$('ml-btn-bulkdel').addEventListener('click', function () {
 			let n = 0;
 			for (let k in state.selected) if (state.selected.hasOwnProperty(k)) n++;
