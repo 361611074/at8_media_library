@@ -87,6 +87,11 @@ function myapp_Thumb(&$url, $upload) {
 
 ## 更新日志
 
+### 1.6.1
+
+- 安全：修复关联越权——`upload` / `update` / `bulk bind` 的 `logid` 新增服务端校验（`at8_media_library_validate_logid`）：文章必须存在且属于自己（或拥有 `UploadAll`），防止通过「关联附件 + 引用检测 / 关联标题回显」探测他人草稿、审核中文章的标题与正文特征
+- 加固：替换附件在 `DelFile()` 与 `SaveFile()` 之间对原文件做临时备份，任一步失败自动恢复原文件并保留记录，杜绝「记录在、文件丢」
+
 ### 1.6.0
 
 - 安全：对齐官方附件管理的数据范围——无 `UploadAll` 权限的用户在列表、统计、筛选、引用检测、编辑页面板中仅能看到自己的附件，服务端强制注入查询条件，不信任前端参数（对齐官方 `Admin_UploadMng` 的 `ul_AuthorID` 过滤）
