@@ -2,6 +2,16 @@
 
 版本号规则：十进制封十进一（每段 0~9，满 10 进位），不用 1.2.10 这类写法。
 
+## 1.6.5（2026-09-24）
+
+规范符合性微调（无功能变更）：
+
+- **`plugin.xml` 元数据补齐**：
+  - `<source>` 节点补 `<email>361611074@qq.com</email>`（与 `<author>` 一致，便于应用中心审核员核对作者信息）。
+  - `<modified>` 日期同步至 2026-09-24。
+- `zbignore.txt` 调整：`README.md` 不再排除（上架审核对使用说明有要求，README 进 zba 包便于审核员查阅）；`CHANGELOG.md` / `RELEASE_CHECKLIST.md` / `screenshots` / `cache` / `.git` 仍按原状排除。
+- 同步更新 `function.php` 版本常量、`plugin.xml`、本日志、`RELEASE_CHECKLIST.md`。
+
 ## 1.6.4（2026-09-23）
 
 - **最低 PHP 版本提高至 7.4**（`plugin.xml` 的 `<phpver>`，应用中心据此拒绝安装）。

@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.4');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.5');
 }
 
 /**

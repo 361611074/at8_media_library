@@ -28,12 +28,13 @@
 	</author>
 	<source>
 		<name>漫步白月光</name>
+		<email>361611074@qq.com</email>
 		<url>https://www.at8.fun/</url>
 	</source>
 	<adapted>172900</adapted>
-	<version>1.6.4</version>
+	<version>1.6.5</version>
 	<pubdate>2026-09-12</pubdate>
-	<modified>2026-09-23</modified>
+	<modified>2026-09-24</modified>
 	<price>0</price>
 	<!-- 最低 PHP 版本（安装门槛，lib/app.php 据此拒绝安装）：7.4
 	     依据：① 全量文件在 PHP 7.3.4 通过 php -l（7.3.4 严于 7.4，向下兼容已覆盖）；
