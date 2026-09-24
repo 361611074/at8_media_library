@@ -2,6 +2,21 @@
 
 版本号规则：十进制封十进一（每段 0~9，满 10 进位），不用 1.2.10 这类写法。
 
+## 1.6.6（2026-09-24）
+
+修复 debug 模式下的一条 PHP 警告（无功能变更）：
+
+- **修复 `at8_media_library_cache_del()` 未判存在即删除导致的 E_WARNING**：
+  该函数原先直接 `@unlink($dir . '/' . md5($key) . '.php')`，没有 `is_file()` 前置判断。
+  Z-BlogPHP 的错误处理器不理会 `@` 抑制，因此在缓存文件本就不存在时（`stats_flush()` 每次
+  写入/替换/删除/关联操作都会删 `stats` / `stats_all` / `stats_u<ID>` 三个键，而缓存可能尚未生成），
+  会向 `zb_users/logs/*-error*.txt` 每次落一条
+  `unlink(...): No such file or directory`（E_WARNING）。
+  现改为先 `is_file()` 再删，与 `at8_media_library_cache_get()` 中的既有写法一致。
+- 触发场景：debug 模式（或站点开启错误日志）下打开媒体库、上传 / 改名 / 删除 / 关联附件。
+  此前在测试站历史日志中已累计出现上百条同类记录（非 1.6.5 引入，属长期遗留）。
+- 同步更新 `function.php` 版本常量、`plugin.xml`、本日志、`README.md`、`RELEASE_CHECKLIST.md`。
+
 ## 1.6.5（2026-09-24）
 
 规范符合性微调（无功能变更）：

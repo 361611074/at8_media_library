@@ -43,7 +43,7 @@
 ## 兼容性
 
 - 适用于 Z-BlogPHP 1.7.0 及以上版本。
-- 需要 PHP 7.4 及以上（`plugin.xml` 声明 `<phpver>7.4</phpver>`，应用中心据此拒绝安装）。全量文件在 7.3.4 通过语法校验、运行时在 8.2 实测零报错，且未使用任何 PHP 8.0+ 专有语法。
+- 需要 PHP 7.4 及以上（`plugin.xml` 声明 `<phpver>7.4</phpver>`，应用中心据此拒绝安装）。全量文件在 7.3.4 通过语法校验、运行时在 PHP 8.2 / 8.3 实测零报错，且未使用任何 PHP 8.0+ 专有语法。
 - 支持 MySQL、SQLite、PostgreSQL 三种数据库。
 - 数据查询全部使用系统自带的 SQL 构造器，不直接拼接 SQL 语句，不创建数据表，不修改系统文件。
 
@@ -87,6 +87,13 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.6.6（2026-09-24）
+
+修复 debug 模式下的一条 PHP 警告（无功能变更）：
+
+- 修复 `at8_media_library_cache_del()` 未判存在即删除导致的 `E_WARNING`（`unlink(...): No such file or directory`）。该函数原先直接 `@unlink()` 缓存文件，而 Z-BlogPHP 的错误处理器不理会 `@` 抑制；缓存文件本就不存在时（`stats_flush()` 每次写操作都会清 3 个统计缓存键）就会向错误日志落一条警告。现改为先 `is_file()` 判断再删；
+- 同步更新 `function.php` 版本常量、`plugin.xml`、`CHANGELOG.md` 与发布检查清单。
 
 ### 1.6.5（2026-09-24）
 

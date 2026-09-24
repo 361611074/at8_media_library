@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.5');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.6');
 }
 
 /**
@@ -1047,7 +1047,13 @@ function at8_media_library_cache_del($key)
 
     $dir = at8_media_library_cache_dir();
     if ($dir !== '') {
-        @unlink($dir . '/' . md5($key) . '.php');
+        // 必须先判存在再删：Z-Blog 的错误处理器不理会 @ 抑制，缓存文件本就不存在时
+        // 直接 unlink 会在 debug 模式下每次落一条 E_WARNING（No such file or directory）。
+        // stats_flush() 每次操作都会删 3 个键，缓存未生成时即触发（与 cache_get 中的写法保持一致）。
+        $file = $dir . '/' . md5($key) . '.php';
+        if (is_file($file)) {
+            @unlink($file);
+        }
     }
 }
 

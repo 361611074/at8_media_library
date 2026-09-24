@@ -1,7 +1,7 @@
-# at8_media_library 1.6.5 — 发布检查清单（RELEASE_CHECKLIST）
+# at8_media_library 1.6.6 — 发布检查清单（RELEASE_CHECKLIST）
 
 检查基准：《Z-BlogPHP 插件 AI Agent 开发规范》§29
-实测环境：Z-BlogPHP **1.7.5** / PHP 7.3.4（本地 `php -l`）+ PHP 8.2（测试站 zblog.xmm.fan）/ MySQL
+实测环境：Z-BlogPHP **1.7.5** / PHP 7.3.4（本地 `php -l`）+ PHP **8.3.33**（测试站 zblog.xmm.fan 实测）/ MySQL
 检查日期：2026-09-24
 
 ## 1. 元数据与标识
@@ -10,7 +10,7 @@
 |---|---|---|
 | 插件 ID | `at8_media_library` | ✅ 由 `media_library` 改名后长期稳定（旧配置自动迁移） |
 | 插件名称 | 媒体库 · 相册式附件管理 | ✅ |
-| 版本号 | 1.6.5（`plugin.xml` 与 `AT8_MEDIA_LIBRARY_VERSION` 一致） | ✅ 十进制封十进一 |
+| 版本号 | 1.6.6（`plugin.xml` 与 `AT8_MEDIA_LIBRARY_VERSION` 一致） | ✅ 十进制封十进一 |
 | 前缀 | 函数 `at8_media_library_*`、PHP 常量 `AT8_MEDIA_LIBRARY_*`、CSS `.mlx-*` / `.ml-*`、JS `window.AT8ML`、配置键 `conf_Name=at8_media_library` | ✅ 本次将 `window.ML` 改名 `window.AT8ML` 以避免命名冲突 |
 | `plugin.xml` 必填节点 | 含 `<description>`、`<phpver>`；author/source 完整 | ✅ |
 | 作者与官网 | 漫步白月光 / https://www.at8.fun/ | ✅ |
