@@ -2,6 +2,52 @@
 
 版本号规则：十进制封十进一（每段 0~9，满 10 进位），不用 1.2.10 这类写法。
 
+## 1.7.1（2026-09-25）
+
+**官方市场审核前最终架构收尾**（无新增功能，不改动附件处理架构）。
+
+### 本次整改内容
+
+- **完成官方市场审核前最终架构收尾**：附件安全、上传、保存、删除、存储与核心生命周期
+  全部由 Z-BlogPHP 官方附件体系承担；媒体库继续聚焦查询、筛选、预览、统计与管理体验。
+- **清理 `replace` 残留**：API 白名单、README、发布清单中不再出现任何把 `replace`
+  当作现存动作的表述。结论依据官方源码实测（见下）：官方附件系统**不存在**稳定、明确、
+  适合第三方插件调用的附件替换 API，故本插件**不提供**「替换文件」功能，也不自行实现
+  一套替换引擎（`backup` / `unlink` / `move_uploaded_file` / `restore` 均无）。
+- **前端命名收敛**：`script/app.js` 中「取消关联」按钮的 DOM id 与变量名由 `*-unlink*`
+  改为 `*-unbind*`。该按钮只解除附件与文章的关联（写 `ul_LogID`），不涉及任何文件操作，
+  改名后全仓库前端代码中不再出现 `unlink` 字样。
+- **适配层作用域收窄（`try / finally`）**：`at8_media_library_official_upload_one()` 对
+  `$_FILES`、`at8_media_library_official_delete_upload()` 对 `$_GET` 的「临时替换 → 调用官方
+  → 还原」改为 `try / finally` 结构。无论官方流程正常返回、抛出 `ZbpErrorException`
+  还是任何 `Throwable`，`finally` 都会完整还原全局变量，不把临时结构残留给同请求内的
+  其他插件；也不修改 `$_POST` / `$_SERVER` 等其他超全局。
+- **API 失败状态码统一**：`at8_media_library_error()` 默认 `$code` 由 `1` 改为 `400`（按
+  「请求参数错误」处理），调用方仍按语义显式传入标准状态码（401 / 403 / 404 / 405 / 500）。
+  「未选择任何附件」「单次最多操作 500 个附件」「关联的文章不存在」「没有收到文件」
+  「单次最多上传 30 个文件」等参数校验失败不再返回 `200 OK`。响应体结构
+  `{success, code, msg}` 不变，前端只判断 `code !== 0`，故**前端零改动**。
+- **版本统一**：`plugin.xml` 的 `<version>`、`function.php` 的 `AT8_MEDIA_LIBRARY_VERSION`、
+  README、CHANGELOG、发布清单、ZBA 文件名统一为 `1.7.1`。
+- **文档修正**：修正发布清单中 `<adapted>` 的语义描述。官方 `c_system_version.php` 定义
+  `$GLOBALS['blogversion'] = ZC_VERSION_MAJOR . ZC_VERSION_MINOR . ZC_VERSION_COMMIT`，
+  且 `lib/app.php` 的 `CheckCompatibility()` 以 `(int)$adapted > (int)$zbp->version` 判定，
+  故 `172900` = **1.7 线 commit 2900**（1.7.5.3540 的 `$zbp->version` 实测为 `173540`），
+  等价于「最低 Z-BlogPHP 1.7.0」。此前发布清单误写为「1.7.2 编码」，本次一并更正。
+
+### 官方替换能力核查结论（1.7.1 新增审计）
+
+对 Z-BlogPHP 1.7.5.3540 全量核心源码做 `replace` 关键字检索：全部命中均为
+`str_replace()` 字符串操作或前端 JS 的 `.replace()`，**不存在任何附件替换相关的官方函数 /
+方法 / Hook**。因此按「官方没有稳定可复用能力时宁可降级功能」的原则，本插件不提供
+「替换文件」功能。
+
+### 兼容性
+
+- 1.7.0 → 1.7.1 可直接覆盖升级，无配置迁移、无数据结构变更。
+- 最低 Z-BlogPHP 1.7.0（`<adapted>172900</adapted>` 不变）；最低 PHP 7.4（不变）。
+- 附件写操作架构与 1.7.0 完全一致，仍分别走官方 `PostUpload()` / `DelUpload()`。
+
 ## 1.7.0（2026-09-25）
 
 **市场合规架构重构**：把本插件从「自行实现附件上传 / 替换 / 删除底层业务」改造成

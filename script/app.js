@@ -421,7 +421,7 @@
 			'<input type="hidden" id="ml-dw-logid" value="' + item.logid + '">' +
 			'<div style="font-size:12px;color:#93a1b5;margin-top:5px" id="ml-dw-post-cur">当前：' +
 			(item.logid > 0 ? '#' + item.logid + ' ' + esc(item.post_title || '') : '未关联') + '</div>' +
-			(item.logid > 0 ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-unlink" style="margin-top:6px">取消关联</button>' : '') +
+			(item.logid > 0 ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-unbind" style="margin-top:6px">取消关联</button>' : '') +
 			'</div></div>' +
 			'<button type="button" class="mlx-btn mlx-btn-primary mlx-dw-save" id="ml-dw-save">保存修改</button>'
 			: '') +
@@ -489,13 +489,14 @@
 			});
 		});
 
-		// 取消关联：清空隐藏域，保存时以 logid=0 提交解除关联
-		let unlinkBtn = $('ml-dw-unlink');
-		if (unlinkBtn) {
-			unlinkBtn.addEventListener('click', function () {
+		// 取消关联（解除附件与文章的关联，不涉及任何文件操作）
+		// 注：元素 id / 变量名用 unbind，避免与「删除文件」语义混淆
+		let unbindBtn = $('ml-dw-unbind');
+		if (unbindBtn) {
+			unbindBtn.addEventListener('click', function () {
 				$('ml-dw-logid').value = '';
 				$('ml-dw-post-cur').textContent = '当前：未关联';
-				unlinkBtn.disabled = true;
+				unbindBtn.disabled = true;
 			});
 		}
 

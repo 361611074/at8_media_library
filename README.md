@@ -2,7 +2,14 @@
 
 以相册（网格）形式集中管理 Z-BlogPHP 的图片与附件，补齐系统默认「附件管理」在筛选、浏览、维护上的不足。
 
-> **定位**：本插件提供媒体库界面、筛选、搜索、预览和批量管理体验；涉及附件上传、保存、删除等系统敏感操作时，优先使用 Z-BlogPHP 官方附件能力，不重复实现或绕过系统安全机制。
+**at8_media_library 是 Z-BlogPHP 官方附件系统之上的高级媒体库管理界面。**
+
+> **定位**
+>
+> - **本插件（媒体库）负责**：查询、筛选、搜索、排序、分页、预览、统计、文章关联，以及批量管理 UI、JSON 接口包装、权限边界与 CSRF。
+> - **Z-BlogPHP 官方附件系统负责**：上传、文件类型与大小校验、文件保存、文件命名、附件记录、附件删除、实际存储删除、云存储 Hook、附件计数与官方生命周期 Hook。
+>
+> 插件不重复实现、不替代、不绕过官方附件能力；官方未提供稳定可复用能力的功能（如附件替换），本插件选择不提供，而不是自行实现一套。
 
 ## 功能
 
@@ -77,7 +84,7 @@
 
 卸载插件不会删除任何已上传的附件文件与数据库记录。
 
-## 开发者接口（v1.5.0 起，v1.7.0 调整）
+## 开发者接口（v1.5.0 起；1.7.1 对外提供 5 个 Filter 接口）
 
 本插件对外暴露 5 个 Filter 接口，**全部只用于展示与查询**。其他插件 / 主题在 `ActivePlugin_应用ID()` 中用官方 `Add_Filter_Plugin()` 挂载即可。`$arg` 声明 `&` 可修改，`$context` 为只读上下文、可不接收。
 
@@ -114,6 +121,19 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.7.1（2026-09-25）
+
+官方市场审核前最终架构收尾（无新增功能，不改动附件处理架构）：
+
+- 完成官方市场审核前最终架构收尾：附件敏感操作全部由 Z-BlogPHP 官方附件体系承担，媒体库继续聚焦查询、筛选、预览、统计与管理体验；
+- 清理残留：API 白名单、README、发布清单中不再出现任何「替换文件 / `replace` 动作」的现存表述（该功能已于 1.7.0 移除。官方附件系统未提供稳定、可复用、适合第三方插件调用的替换 API，故本插件不提供该功能，也不自行实现一套替换引擎）；
+- 统一 API、前端、README、CHANGELOG、发布清单与版本号；
+- 前端 `script/app.js` 中「取消关联」按钮的 DOM id 与变量名由 `*-unlink*` 改为 `*-unbind*`，避免与「删除文件」语义混淆（该按钮只解除附件与文章的关联，不涉及任何文件操作）；
+- `$_FILES` / `$_GET` 的官方调用适配改为 `try / finally` 结构：无论官方流程正常返回、抛 `ZbpErrorException` 还是任何 `Throwable`，都会在 `finally` 中完整还原全局变量，不污染同请求内的其他插件；
+- 统一 API 失败响应状态码：`at8_media_library_error()` 默认按「请求参数错误」返回 `400`，未选择附件 / 超批量上限 / 关联文章不存在 / 无文件 / 超上传数量等参数校验失败不再返回 `200 OK`（响应体结构 `{success, code, msg}` 不变，前端零改动）；
+- 修正发布清单中 `<adapted>` 的语义描述：官方口径为 `MAJOR.MINOR.COMMIT`（`c_system_version.php` 的 `$GLOBALS['blogversion']`），`172900` = 1.7 线 commit 2900，等价于「最低 Z-BlogPHP 1.7.0」；
+- 降低与官方核心及第三方存储扩展的长期维护成本。
 
 ### 1.7.0（2026-09-25）
 
@@ -156,7 +176,7 @@ function myapp_Thumb(&$url, $upload) {
 
 ### 1.6.2
 
-- 安全：写操作（`upload` / `replace` / `update` / `bulk` / `delete`）强制 POST，非 POST 返回 `405`（注：`replace` 动作已于 **1.7.0** 随「替换文件」功能一并移除）
+- 安全：写操作（`upload` / `update` / `bulk` / `delete`；1.7.0 前另含 `replace`，该动作已随「替换文件」功能一并移除）强制 POST，非 POST 返回 `405`
 - 安全：`act` 不再读 `$_REQUEST`（含 COOKIE），改为显式「POST 优先 → GET 兜底」，并按只读 / 写操作两张白名单分发，未列出一律 `400`；未知动作不再回显原始输入
 - 安全：CSRF 校验非 POST 不再静默跳过，改为直接拒绝（防新增调用点漏校验）
 - 规范：JSON 响应新增 `success` 布尔字段（`{success, code, msg, data}`），`code` / `msg` 保持不变，前端零改动
@@ -186,7 +206,7 @@ function myapp_Thumb(&$url, $upload) {
 
 ### 1.5.0
 
-- 新增：对外暴露 8 个 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节（其中 `AllowExts` / `UploadSucceed` / `DeleteSucceed` 已于 1.7.0 移除）
+- 新增：对外暴露 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节（**当前对外提供 5 个展示与查询接口**；其中 `AllowExts` / `UploadSucceed` / `DeleteSucceed` 已于 1.7.0 移除）
 - 新增：编辑页面板输出经接口过滤后再渲染（内容经输出缓冲捕获，不影响原有结构）
 
 ### 1.4.2

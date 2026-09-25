@@ -8,12 +8,12 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.7.0');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.7.1');
 }
 
 /**
  * ============================================================================
- * 架构说明（1.7.0 市场合规重构）
+ * 架构说明（1.7.0 市场合规重构 · 1.7.1 审核收尾）
  * ============================================================================
  * 本插件只负责「媒体库体验层」：查询 / 筛选 / 搜索 / 排序 / 统计 / 预览 /
  * 灯箱 / 复制代码 / 文章关联 UI。
@@ -92,7 +92,35 @@ function at8_media_library_json($arr)
     die();
 }
 
-function at8_media_library_error($msg, $code = 1)
+/**
+ * 把 php.ini 的容量写法（如 "50M" / "2G" / "512K"）换算为字节数
+ * 仅用于「请求体是否已达 post_max_size」的可诊断提示，不参与任何安全判定
+ */
+function at8_media_library_ini_bytes($val)
+{
+    $val = trim((string) $val);
+    if ($val === '') {
+        return 0;
+    }
+    $num = (int) $val;
+    $unit = strtolower(substr($val, -1));
+    if ($unit === 'g') {
+        $num *= 1024 * 1024 * 1024;
+    } elseif ($unit === 'm') {
+        $num *= 1024 * 1024;
+    } elseif ($unit === 'k') {
+        $num *= 1024;
+    }
+    return $num;
+}
+
+/**
+ * 统一失败响应
+ * $code 默认 400（请求参数错误），调用方按语义显式传入标准状态码：
+ * 401 未登录 / 403 无权限 / 404 资源不存在 / 405 方法不允许 / 500 服务端能力缺失；
+ * 需要插件自有业务码时显式传入（如「插件未启用」48，<400 不同步 HTTP 状态码）。
+ */
+function at8_media_library_error($msg, $code = 400)
 {
     // 业务 code 落在标准 HTTP 状态区间（400~599）时，同步设置为 HTTP 状态码，
     // 使 WAF / 访问日志 / 监控能按标准语义识别失败请求；响应体仍保留 code / success 供前端判断。
@@ -1532,6 +1560,10 @@ function at8_media_library_upload_error_text($code)
  * 这不是「伪造 POST 请求」，没有 HTTP 往返、没有 include cmd.php、没有模拟浏览器，
  * 也没有绕过官方任何一道校验——所有校验仍由官方代码执行。
  *
+ * 【1.7.1】作用域收窄：临时替换与还原包在 try / finally 中，正常返回、抛出
+ * ZbpErrorException、或任何 Throwable 都会在 finally 里还原 $_FILES，
+ * 不把临时结构残留给同请求中的其他插件；也不修改 $_POST / $_SERVER 等其它超全局。
+ *
  * 官方校验失败时 ShowError() 抛出 ZbpErrorException（非 die），此处捕获后转成
  * 插件统一的 JSON 错误，不向前端回显原始异常文本 / 路径 / SQL / 堆栈。
  * ---------------------------------------------------------------------------
@@ -1565,9 +1597,10 @@ function at8_media_library_official_upload_one($fileInfo)
         $caught = $e;
     } catch (Throwable $e) {
         $caught = $e;
+    } finally {
+        // 无论正常返回、抛异常还是被官方流程中断，都在此还原全局 $_FILES
+        $_FILES = $savedFiles;
     }
-
-    $_FILES = $savedFiles;
 
     if ($caught !== null) {
         at8_media_library_error(at8_media_library_official_error_text($caught), 400);
@@ -1599,6 +1632,10 @@ function at8_media_library_official_upload_one($fileInfo)
  *
  * 适配动作：官方 DelUpload() 从 $_GET['id'] 取目标附件 ID，故此处临时写入该值，
  * 调用后立即还原。这同样不是伪造 HTTP 请求，权限与所有权仍由官方重新判定。
+ *
+ * 【1.7.1】作用域收窄：临时写入与还原包在 try / finally 中，正常返回、抛异常或
+ * 任何 Throwable 都会在 finally 里整体还原 $_GET（用整体赋值而非只删 id 键，
+ * 保证还原前 $_GET 的原貌，包括本就不存在的 id 键），不污染同请求中的其他插件。
  * ---------------------------------------------------------------------------
  *
  * @param int $id 附件 ID
@@ -1622,9 +1659,10 @@ function at8_media_library_official_delete_upload($id)
         $caught = $e;
     } catch (Throwable $e) {
         $caught = $e;
+    } finally {
+        // 无论正常返回、抛异常还是被官方流程中断，都在此整体还原全局 $_GET
+        $_GET = $savedGet;
     }
-
-    $_GET = $savedGet;
 
     if ($caught !== null) {
         // 官方 ShowError(6)（无 UploadDel 权限）等：不外抛异常文本，只记审计
@@ -1690,7 +1728,7 @@ function at8_media_library_validate_logid($logid)
     }
     $post = $zbp->GetPostByID($logid);
     if ($post->ID == 0 || (int) $post->ID !== $logid) {
-        at8_media_library_error('关联的文章不存在');
+        at8_media_library_error('关联的文章不存在', 400);
     }
     if (!at8_media_library_can_all() && (int) $post->AuthorID !== (int) $zbp->user->ID) {
         at8_media_library_error('只能关联到自己的文章', 403);

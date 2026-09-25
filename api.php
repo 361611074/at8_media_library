@@ -3,7 +3,7 @@
 # 作者：漫步白月光 https://www.at8.fun/
 #
 # ============================================================================
-# 职责边界（1.7.0 市场合规重构）
+# 职责边界（1.7.0 市场合规重构 · 1.7.1 审核收尾）
 # ============================================================================
 # 本文件只做：认证 → 权限 → CSRF → 参数校验 → 调用官方附件能力 → 输出 JSON。
 #
@@ -113,14 +113,16 @@ if ($act == 'upload') {
         $files = at8_media_library_normalize_files('file');
     }
     if (count($files) == 0) {
-        // 请求体超过 php.ini 的 post_max_size 时，PHP 会清空 $_FILES 且不报错，此处给出可诊断提示
-        if (isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
-            at8_media_library_error('没有收到文件：请求体可能超过服务器 post_max_size（' . ini_get('post_max_size') . '）上限，请调大 php.ini 后重试');
+        // 请求体达到 php.ini 的 post_max_size 时，PHP 会静默清空 $_POST / $_FILES，此处给出可诊断提示
+        $cl = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+        $pm = at8_media_library_ini_bytes(ini_get('post_max_size'));
+        if ($cl > 0 && $pm > 0 && $cl >= $pm) {
+            at8_media_library_error('没有收到文件：请求体已达服务器 post_max_size（' . ini_get('post_max_size') . '）上限，请调大 php.ini 后重试', 400);
         }
-        at8_media_library_error('没有收到文件');
+        at8_media_library_error('没有收到文件', 400);
     }
     if (count($files) > 30) {
-        at8_media_library_error('单次最多上传 30 个文件，请分批处理');
+        at8_media_library_error('单次最多上传 30 个文件，请分批处理', 400);
     }
 
     $rows = array();
@@ -129,7 +131,7 @@ if ($act == 'upload') {
         // 这不是插件的安全判定，站点级类型 / 体积规则仍由官方流程裁决。
         $err = isset($f['error']) ? (int) $f['error'] : 4;
         if ($err !== 0) {
-            at8_media_library_error('上传失败：' . at8_media_library_upload_error_text($err));
+            at8_media_library_error('上传失败：' . at8_media_library_upload_error_text($err), 400);
         }
 
         // 交给官方附件上传能力（官方 PostUpload：权限复核 + 类型 / 体积 / 重名校验 +
@@ -187,11 +189,11 @@ if ($act == 'bulk') {
         }
     }
     if (count($idArr) == 0) {
-        at8_media_library_error('未选择任何附件');
+        at8_media_library_error('未选择任何附件', 400);
     }
     $idArr = array_values(array_unique($idArr));
     if (count($idArr) > 500) {
-        at8_media_library_error('单次最多操作 500 个附件，请分批处理');
+        at8_media_library_error('单次最多操作 500 个附件，请分批处理', 400);
     }
 
     if ($op == 'delete') {
