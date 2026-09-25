@@ -21,6 +21,12 @@ if ($ml_perpage <= 0) {
 }
 
 // 需要传递给前端的配置
+//
+// uploadAccept / uploadMaxMb 只是把官方站点配置（ZC_UPLOAD_FILETYPE / ZC_UPLOAD_FILESIZE）
+// 读出来交给浏览器做「文件选择框过滤 + 提示文案」，不是插件的安全白名单：
+// 真正的类型与体积裁决只发生在官方 Upload::CheckExtName() / CheckSize() 内部。
+$ml_types = at8_media_library_site_upload_filetypes();
+$ml_accept = (count($ml_types) > 0) ? ('.' . implode(',.', $ml_types)) : '';
 $ml_config = array(
     'api' => $zbp->host . 'zb_users/plugin/at8_media_library/api.php',
     'host' => $zbp->host,
@@ -29,6 +35,8 @@ $ml_config = array(
     'canDelete' => (isset($GLOBALS['actions']['UploadDel']) ? $zbp->CheckRights('UploadDel') : ($zbp->CheckRights('UploadAll') || $zbp->CheckRights('root'))) ? 1 : 0,
     'perpage' => $ml_perpage,
     'user' => $zbp->user->Name,
+    'uploadAccept' => $ml_accept,
+    'uploadMaxMb' => at8_media_library_site_upload_filesize_mb(),
 );
 $ml_config_json = json_encode($ml_config, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
@@ -133,8 +141,8 @@ require $blogpath . 'zb_system/admin/admin_top.php';
 	</div>
 	<div class="mlx-up-drop" id="ml-up-drop">
 		<p>点击选择文件，或拖拽到此处</p>
-		<p class="mlx-up-sub">支持图片、视频、音频、文档、压缩包，可多选</p>
-		<input type="file" id="ml-up-input" multiple>
+		<p class="mlx-up-sub">可上传类型与单文件大小上限跟随站点「网站设置 → 允许上传的文件类型 / 大小」；同名文件在同一月份内不允许重复</p>
+		<input type="file" id="ml-up-input" multiple accept="<?php echo htmlspecialchars($ml_accept, ENT_QUOTES); ?>">
 	</div>
 	<div class="mlx-up-list" id="ml-up-list"></div>
 </div>

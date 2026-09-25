@@ -2,19 +2,46 @@
 
 以相册（网格）形式集中管理 Z-BlogPHP 的图片与附件，补齐系统默认「附件管理」在筛选、浏览、维护上的不足。
 
+> **定位**：本插件提供媒体库界面、筛选、搜索、预览和批量管理体验；涉及附件上传、保存、删除等系统敏感操作时，优先使用 Z-BlogPHP 官方附件能力，不重复实现或绕过系统安全机制。
+
 ## 功能
 
 1. **相册网格视图 / 列表视图**一键切换，图片直接显示缩略图，其他文件显示类型图标。
 2. **按文章分类筛选**：附件通过所属文章自动关联到分类，支持含子分类，侧栏显示各分类附件数量。
 3. **多维筛选**：文件类型（图片 / 视频 / 音频 / 文档 / 压缩包 / 其他）、上传月份、上传者、关联文章、是否已关联文章。
 4. **关键词搜索**：文件名、原始文件名、说明。
-5. **拖拽或多选上传**，实时进度条；上传时可指定关联文章。
-6. **替换文件**：保留原有附件记录与 URL 不变，只换内容。
-7. **详情侧栏**：大图预览、图片尺寸、文件大小、上传者、文件是否存在；一键复制 URL / HTML / Markdown 代码。
-8. **编辑信息**：标题、说明、图片 Alt（保存在附件自定义域，不改动系统数据表结构）。
-9. **批量操作**：全选本页、批量删除、批量关联到指定文章。
-10. **灯箱大图浏览**，支持键盘左右切换与 Esc 关闭。
-11. **统计概览**：附件总数、图片数、占用空间、未关联文章数。
+5. **拖拽或多选上传**，实时进度条；上传时可指定关联文章。可上传类型与单文件大小上限跟随站点「网站设置 → 允许上传的文件类型 / 大小」。
+6. **详情侧栏**：大图预览、图片尺寸、文件大小、上传者、文件状态；一键复制 URL / HTML / Markdown 代码。
+7. **编辑信息**：标题、说明、图片 Alt（保存在附件自定义域，不改动系统数据表结构）。
+8. **批量操作**：全选本页、批量删除、批量关联到指定文章。
+9. **灯箱大图浏览**，支持键盘左右切换与 Esc 关闭。
+10. **统计概览**：附件总数、图片数、占用空间、未关联文章数。
+
+## 架构与合规
+
+本插件**不是**一套独立的附件系统，而是 Z-BlogPHP 官方附件系统之上的管理界面。附件生命周期完全由官方负责：
+
+| 操作 | 插件做的事 | 实际执行的官方能力 |
+|---|---|---|
+| 上传 | 权限 / CSRF / 参数校验 → 调用官方上传能力 | `PostUpload()`（`zb_system/function/c_system_event.php`） |
+| 删除 | 权限 / CSRF / 数据范围校验 → 调用官方删除能力 | `DelUpload()`（`zb_system/function/c_system_event.php`） |
+| 编辑信息 | 只写自有展示字段与 `LogID` 关联 | `Upload::Save()`（`zb_system/function/lib/base/upload.php`） |
+| 查询 / 筛选 / 统计 | 插件自有 | 官方 `Upload` 表 + 官方 SQL 构造器 |
+
+官方 `PostUpload()` / `DelUpload()` 内部完成的事情，插件**一律不重复实现**：
+
+- 文件类型安全（`Upload::CheckExtName()`，读取站点「允许上传的文件类型」，并硬拒绝 `php` / `phtml` / `phar` / `.htaccess` / `web.config`）；
+- 文件体积安全（`Upload::CheckSize()`，读取站点「允许上传的大小」）；
+- 同名文件规则（官方同月重名判定）；
+- 文件落盘与存储路径规则（`Upload::SaveFile()`，含 `Filter_Plugin_Upload_SaveFile` 云存储 Hook）；
+- 附件记录写入（`Upload::Save()`）与官方对象缓存（`$zbp->AddCache()`）；
+- 用户附件计数（`CountMemberArray()`）；
+- 官方上传成功 Hook（`Filter_Plugin_PostUpload_Succeed`）；
+- 附件删除与云存储删除 Hook（`Upload::DelFile()` + `Filter_Plugin_Upload_DelFile`）。
+
+插件**不**修改 `zb_system/` 下任何核心文件，不覆盖官方 `Upload` 类，不替换 `cmd.php`，不拦截、不替代、不复制、不绕过任何系统预留接口。
+
+插件负责的边界只有：登录校验、CSRF 校验、权限校验（`UploadPst` / `UploadDel` / `UploadAll`）、数据范围限制（与官方附件管理一致）、参数格式校验、UI 输出转义。
 
 ## 界面预览
 
@@ -35,10 +62,9 @@
 
 - **浏览**：进入「媒体库」即可看到全部附件，默认按上传时间倒序。右上角可切换网格 / 列表视图，可调整每页数量与排序方式。
 - **筛选**：左侧筛选栏选择文件类型、文章分类、上传月份、上传者，或直接搜索关键词；多个条件同时生效。
-- **上传**：点击「上传文件」选择文件，也可以直接把文件拖到页面中；上传前可指定要关联的文章。
+- **上传**：点击「上传文件」选择文件，也可以直接把文件拖到页面中；上传前可指定要关联的文章。可上传类型、单文件大小上限、同名文件规则均以站点「网站设置」与官方附件系统为准。
 - **编辑**：点击任意附件打开右侧详情，修改标题、说明、Alt，或重新关联到其它文章。
-- **替换**：在详情中点击「替换文件」，选择新文件即可，附件地址保持不变。
-- **删除**：勾选附件后使用批量删除，或在详情中删除单个附件（会同时删除磁盘文件）。
+- **删除**：勾选附件后使用批量删除，或在详情中删除单个附件（由官方附件系统删除文件与记录）。
 
 ## 兼容性
 
@@ -51,33 +77,34 @@
 
 卸载插件不会删除任何已上传的附件文件与数据库记录。
 
-## 开发者接口（v1.5.0 起）
+## 开发者接口（v1.5.0 起，v1.7.0 调整）
 
-本插件对外暴露 7 个 Filter 接口，其他插件 / 主题在 `ActivePlugin_应用ID()` 中用官方 `Add_Filter_Plugin()` 挂载即可。`$arg` 声明 `&` 可修改，`$context` 为只读上下文、可不接收。
+本插件对外暴露 5 个 Filter 接口，**全部只用于展示与查询**。其他插件 / 主题在 `ActivePlugin_应用ID()` 中用官方 `Add_Filter_Plugin()` 挂载即可。`$arg` 声明 `&` 可修改，`$context` 为只读上下文、可不接收。
 
 | 接口名 | 回调签名 | 说明 |
 |---|---|---|
-| `Filter_Plugin_at8_media_library_AllowExts` | `(&$allow)` | 上传白名单过滤（硬拒绝清单 php/exe/svg 等不受影响） |
 | `Filter_Plugin_at8_media_library_ListWhere` | `(&$where, $p)` | 列表查询条件过滤（追加自定义筛选维度） |
 | `Filter_Plugin_at8_media_library_Thumb` | `(&$url, $upload)` | 缩略图地址接管（云存储 / CDN / 缩略图插件） |
 | `Filter_Plugin_at8_media_library_Row` | `(&$row, $upload)` | 附件行数据输出前过滤（追加自定义字段 / 徽标） |
 | `Filter_Plugin_at8_media_library_Stats` | `(&$stats)` | 统计口径过滤（覆盖缓存与重算全部返回路径） |
-| `Filter_Plugin_at8_media_library_UploadSucceed` | `($upload)` | 上传成功事件（生成缩略图、同步推送等后续处理） |
-| `Filter_Plugin_at8_media_library_DeleteSucceed` | `($upload)` | 删除成功事件（单个与批量删除均触发） |
 | `Filter_Plugin_at8_media_library_EditPanel` | `(&$html)` | 编辑页「文章附件」面板 HTML 过滤 |
 
-> 安全边界：接口基于官方 `DefinePluginFilter()` 声明机制，其他插件经 `Add_Filter_Plugin()` 挂载。`AllowExts` 仅放宽**插件层**白名单，系统官方 `Upload::SaveFile()` 的站点「允许上传的文件类型」校验仍然生效，无法借接口绕过系统安全检查。
+> **安全边界**：接口基于官方 `DefinePluginFilter()` 声明机制，其他插件经 `Add_Filter_Plugin()` 挂载。这些接口都只能影响**展示与查询结果**，无法影响附件的写入 / 删除路径，也不存在「绕过官方上传白名单」的通路。
 
-示例：放行自定义格式并接管缩略图
+### v1.7.0 起移除的接口
+
+| 原接口 | 移除原因 | 替代方案 |
+|---|---|---|
+| `Filter_Plugin_at8_media_library_AllowExts` | 会成为「绕过官方上传白名单」的第二个判断入口 | 上传类型请通过后台「网站设置 → 允许上传的文件类型」调整，由官方 `Upload::CheckExtName()` 统一裁决 |
+| `Filter_Plugin_at8_media_library_UploadSucceed` | 与官方上传成功 Hook 重复 | 使用官方 `Filter_Plugin_PostUpload_Succeed`（由官方 `PostUpload()` 触发，媒体库上传同样会走到） |
+| `Filter_Plugin_at8_media_library_DeleteSucceed` | 官方附件系统未提供删除成功 Hook，插件不再自造一个涉及附件敏感业务的接口 | 如确需感知删除，请挂官方 `Filter_Plugin_Upload_Del`（删除记录前触发） |
+
+示例：接管缩略图地址
 
 ```php
 RegisterPlugin("myapp", "ActivePlugin_myapp");
 function ActivePlugin_myapp() {
-  Add_Filter_Plugin('Filter_Plugin_at8_media_library_AllowExts', 'myapp_AllowExts');
   Add_Filter_Plugin('Filter_Plugin_at8_media_library_Thumb', 'myapp_Thumb');
-}
-function myapp_AllowExts(&$allow) {
-  $allow[] = 'webmanifest'; // 追加自定义格式
 }
 function myapp_Thumb(&$url, $upload) {
   if (in_array(pathinfo($upload->Name, PATHINFO_EXTENSION), array('jpg', 'png'))) {
@@ -87,6 +114,21 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.7.0（2026-09-25）
+
+**市场合规架构重构**——把插件从「自行实现附件上传 / 替换 / 删除底层业务」改造成「媒体库 UI + Z-BlogPHP 官方附件系统适配层」。
+
+- 重构附件写操作架构，对齐 Z-BlogPHP 官方附件处理流程：上传改走官方 `PostUpload()`，删除改走官方 `DelUpload()`，编辑信息走官方 `Upload::Save()`；
+- 移除插件自行维护的附件底层安全 / 存储逻辑：不再自建上传白名单、不再自算文件命名、不再自测 MIME 与图片内容、不再自读 `php.ini` 判定体积、不再自行落盘、不再自行 `unlink` 附件文件、不再自行同步用户附件计数；
+- 上传的类型 / 体积 / 同名规则全部改由官方 `Upload::CheckExtName()` / `CheckSize()` 与官方同月重名判定裁决，插件不再拥有第二个安全判断入口；
+- 删除「替换文件」功能：Z-BlogPHP 官方附件系统未提供可复用的附件替换能力，为不自行维护一套「文件替换引擎」与伪原子事务，本版本移除该功能（如需换图请删除后重新上传）；
+- 移除 `Filter_Plugin_at8_media_library_AllowExts` / `UploadSucceed` / `DeleteSucceed` 三个涉及附件敏感业务的对外接口，保留 `ListWhere` / `Thumb` / `Row` / `Stats` / `EditPanel` 五个展示与查询接口；
+- 缓存 Key 补站点环境前缀：同一服务器多站点共用 Redis / APCu 时不再互相命中；
+- 保留媒体库查询、筛选、搜索、预览、灯箱、统计、文章关联等核心功能；
+- 降低与第三方存储插件及未来 Z-BlogPHP 更新之间的兼容维护成本。
+
+> 升级说明：1.6.6 → 1.7.0 可直接覆盖升级，插件配置、已有附件记录与附件文件全部保留；升级后附件写操作即进入新架构，不再回落到旧上传引擎。
 
 ### 1.6.6（2026-09-24）
 
@@ -114,7 +156,7 @@ function myapp_Thumb(&$url, $upload) {
 
 ### 1.6.2
 
-- 安全：写操作（`upload` / `replace` / `update` / `bulk` / `delete`）强制 POST，非 POST 返回 `405`
+- 安全：写操作（`upload` / `replace` / `update` / `bulk` / `delete`）强制 POST，非 POST 返回 `405`（注：`replace` 动作已于 **1.7.0** 随「替换文件」功能一并移除）
 - 安全：`act` 不再读 `$_REQUEST`（含 COOKIE），改为显式「POST 优先 → GET 兜底」，并按只读 / 写操作两张白名单分发，未列出一律 `400`；未知动作不再回显原始输入
 - 安全：CSRF 校验非 POST 不再静默跳过，改为直接拒绝（防新增调用点漏校验）
 - 规范：JSON 响应新增 `success` 布尔字段（`{success, code, msg, data}`），`code` / `msg` 保持不变，前端零改动
@@ -144,7 +186,7 @@ function myapp_Thumb(&$url, $upload) {
 
 ### 1.5.0
 
-- 新增：对外暴露 7 组 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节
+- 新增：对外暴露 8 个 Filter 接口（`AllowExts` / `ListWhere` / `Thumb` / `Row` / `Stats` / `UploadSucceed` / `DeleteSucceed` / `EditPanel`），其他插件经官方 `Add_Filter_Plugin()` 挂载即可扩展本插件行为，详见「开发者接口」章节（其中 `AllowExts` / `UploadSucceed` / `DeleteSucceed` 已于 1.7.0 移除）
 - 新增：编辑页面板输出经接口过滤后再渲染（内容经输出缓冲捕获，不影响原有结构）
 
 ### 1.4.2

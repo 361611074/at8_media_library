@@ -9,14 +9,18 @@ RegisterPlugin("at8_media_library", "ActivePlugin_at8_media_library");
 
 # 对外声明本插件的扩展接口（官方 DefinePluginFilter 机制：先声明，其他插件的
 # ActivePlugin 中 Add_Filter_Plugin 才能挂载成功；include 在所有 ActivePlugin 调用前完成）
+#
+# 【1.7.0 市场合规调整】本插件只声明「展示 / 查询」类扩展接口。
+# 原 AllowExts / UploadSucceed / DeleteSucceed 三个接口直接涉及附件敏感业务，已移除：
+#   · 上传类型是否放行 → 只由官方 Upload::CheckExtName()（ZC_UPLOAD_FILETYPE）裁决，
+#     插件不再提供任何可绕过官方上传白名单的入口；
+#   · 上传成功事件 → 请使用官方 Filter_Plugin_PostUpload_Succeed（由官方 PostUpload() 触发）；
+#   · 删除成功事件 → 官方附件系统未提供删除成功 Hook，插件也不再自造一个。
 if (function_exists('DefinePluginFilter')) {
-    DefinePluginFilter('Filter_Plugin_at8_media_library_AllowExts');      // (&$allow) 上传白名单
     DefinePluginFilter('Filter_Plugin_at8_media_library_ListWhere');      // (&$where, $p) 列表查询条件
     DefinePluginFilter('Filter_Plugin_at8_media_library_Thumb');          // (&$url, $upload) 缩略图地址
     DefinePluginFilter('Filter_Plugin_at8_media_library_Row');            // (&$row, $upload) 行数据
     DefinePluginFilter('Filter_Plugin_at8_media_library_Stats');          // (&$stats) 统计口径
-    DefinePluginFilter('Filter_Plugin_at8_media_library_UploadSucceed');  // ($upload) 上传成功事件
-    DefinePluginFilter('Filter_Plugin_at8_media_library_DeleteSucceed');  // ($upload) 删除成功事件
     DefinePluginFilter('Filter_Plugin_at8_media_library_EditPanel');      // (&$html) 编辑页面板 HTML
 }
 

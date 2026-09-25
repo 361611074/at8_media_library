@@ -8,8 +8,27 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.6.6');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.7.0');
 }
+
+/**
+ * ============================================================================
+ * 架构说明（1.7.0 市场合规重构）
+ * ============================================================================
+ * 本插件只负责「媒体库体验层」：查询 / 筛选 / 搜索 / 排序 / 统计 / 预览 /
+ * 灯箱 / 复制代码 / 文章关联 UI。
+ *
+ * 附件的上传、保存、类型校验、体积校验、命名规则、存储路径、云存储 Hook、
+ * 附件记录写入、用户附件计数、附件删除，全部由 Z-BlogPHP 官方附件系统完成：
+ *
+ *   上传 → 官方 PostUpload()   （c_system_event.php）
+ *   删除 → 官方 DelUpload()    （c_system_event.php）
+ *   保存 → 官方 Upload::Save() （lib/base/upload.php）
+ *
+ * 插件不再自行实现任何一套附件安全 / 存储体系，也不拦截、不替代、不复制
+ * 系统预留接口。详见 at8_media_library_official_upload_one() 的注释。
+ * ============================================================================
+ */
 
 /**
  * 触发本插件的对外接口（官方机制：DefinePluginFilter 声明 + Add_Filter_Plugin 注册）
@@ -507,10 +526,13 @@ function at8_media_library_upload_row($u)
         $row['alt'] = (string) @$u->Metas->media_alt;
     }
 
-    // 文件存在性（云存储兼容口径，不能以「本地文件是否存在」判断附件丢失）：
-    // - 系统标准记录：URL 由系统/云存储 hook 提供，一律视为可访问（exists=1）；
+    // 文件存在性【只读展示，不参与任何写决策】
+    // 云存储兼容口径：不能以「本地文件是否存在」判断官方附件是否丢失。
+    // - 系统标准记录：URL 由系统 / 云存储 Hook 提供，一律视为可访问（exists=1）；
     //   本地文件缺失时仅标记 local_missing=1，前端显示中性提示（可能已转存云端）
-    // - 旧格式记录（历史前缀存储）：不经官方存储流程，云插件不会接管，本地缺失即为真缺失
+    // - 早期版本的历史记录（ul_Name 里存了路径前缀，非官方标准格式）：
+    //   这类记录不经官方存储流程、云插件不会接管，本地缺失即为真缺失
+    // 注意：删除 / 上传 / 替换等写操作已全部交给官方附件体系，本处结果只用于界面展示。
     $file = at8_media_library_disk_path($u);
     if (at8_media_library_is_standard_name($u->Name)) {
         $row['exists'] = 1;
@@ -520,10 +542,12 @@ function at8_media_library_upload_row($u)
         $row['local_missing'] = 0;
     }
 
-    // 图片尺寸（请求内静态缓存，key 含 mtime 防替换后读到旧尺寸；避免同请求内重复读盘）
+    // 图片尺寸【只读展示】：仅在本地确实存在该文件时读取，读取失败即 0（不报错、不影响任何流程）
+    // 这不是上传校验——上传阶段不做任何图片内容检测，由官方流程裁决。
+    // 请求内静态缓存，key 含 mtime 防替换后读到旧尺寸；避免同请求内重复读盘。
     $row['width'] = 0;
     $row['height'] = 0;
-    if ($row['kind'] == 'image' && $file !== '') {
+    if ($row['kind'] == 'image' && $file !== '' && $row['local_missing'] == 0) {
         static $dimCache = array();
         $ck = $file . '|' . (string) @filemtime($file);
         if (!isset($dimCache[$ck])) {
@@ -933,9 +957,36 @@ function at8_media_library_cache_dir()
     return $dir;
 }
 
+/**
+ * 缓存 Key 的站点环境前缀
+ *
+ * Redis / APCu 是按服务器进程共享的：同一台服务器上若并存多个 Z-BlogPHP 站点，
+ * 不带站点标识的 Key（如 at8ml:stats_all）会互相命中，把 A 站的统计串给 B 站。
+ * 因此所有缓存 Key 统一加站点根目录指纹；文件缓存本身在站点目录内，加了也无害。
+ * （口径依据：缓存 Key 必须包含用户范围 / 权限范围 / 筛选参数 / 站点环境）
+ */
+function at8_media_library_cache_scope()
+{
+    global $zbp;
+    static $scope = null;
+    if ($scope !== null) {
+        return $scope;
+    }
+    $env = '';
+    if (isset($zbp) && is_object($zbp)) {
+        if (isset($zbp->path) && (string) $zbp->path !== '') {
+            $env = (string) $zbp->path;
+        } elseif (isset($zbp->option['ZC_BLOG_HOST'])) {
+            $env = (string) $zbp->option['ZC_BLOG_HOST'];
+        }
+    }
+    $scope = substr(md5($env), 0, 12) . ':';
+    return $scope;
+}
+
 function at8_media_library_cache_get($key)
 {
-    $key = 'at8ml:' . $key;
+    $key = 'at8ml:' . at8_media_library_cache_scope() . $key;
 
     // 1) Redis
     $r = at8_media_library_cache_redis();
@@ -986,7 +1037,7 @@ function at8_media_library_cache_get($key)
 
 function at8_media_library_cache_set($key, $data, $ttl = 0)
 {
-    $key = 'at8ml:' . $key;
+    $key = 'at8ml:' . at8_media_library_cache_scope() . $key;
     $payload = array('_e' => ($ttl > 0 ? time() + (int) $ttl : 0), 'd' => $data);
 
     // 1) Redis
@@ -1030,7 +1081,7 @@ function at8_media_library_cache_set($key, $data, $ttl = 0)
 
 function at8_media_library_cache_del($key)
 {
-    $key = 'at8ml:' . $key;
+    $key = 'at8ml:' . at8_media_library_cache_scope() . $key;
 
     $r = at8_media_library_cache_redis();
     if ($r) {
@@ -1285,61 +1336,11 @@ function at8_media_library_list($p)
 }
 
 /**
- * 生成落盘用的安全文件名
- * 只保留中文、字母、数字、点、下划线、连字符，其余一律替换为下划线。
- * 这样文件名不含 %、空格、引号、括号等，保证「磁盘名 == URL 路径」，避免链接 404 与特殊字符引发的问题。
- */
-function at8_media_library_safe_filename($name)
-{
-    $name = str_replace("\0", '', (string) $name);
-    $name = basename($name);
-
-    // 拆出扩展名并强制为纯字母数字
-    $dot = strrpos($name, '.');
-    $ext = '';
-    if ($dot !== false) {
-        $ext = strtolower(preg_replace('/[^A-Za-z0-9]/', '', substr($name, $dot + 1)));
-        $name = substr($name, 0, $dot);
-    }
-
-    // 主名部分：仅保留中文 / 字母 / 数字 / . _ -
-    $base = preg_replace('/[^\x{4e00}-\x{9fa5}A-Za-z0-9._-]+/u', '_', $name);
-    if ($base === null) { // 非法 UTF-8 时退回纯 ASCII 处理
-        $base = preg_replace('/[^A-Za-z0-9._-]+/', '_', $name);
-    }
-    $base = preg_replace('/_{2,}/', '_', $base);
-    $base = trim($base, '._-');
-
-    if (function_exists('mb_strlen') && function_exists('mb_substr') && mb_strlen($base, 'UTF-8') > 60) {
-        $base = mb_substr($base, 0, 60, 'UTF-8');
-    }
-
-    if ($base === '') {
-        $base = 'file';
-    }
-
-    return ($ext === '') ? $base : ($base . '.' . $ext);
-}
-
-/**
- * 生成用于展示的原始文件名（仅去控制字符，保留用户可读的原始名称）
- */
-function at8_media_library_display_name($name)
-{
-    $name = str_replace(array("\0", "\r", "\n", "\t"), ' ', (string) $name);
-    $name = basename($name);
-    $name = trim($name);
-    if ($name === '') {
-        $name = 'file';
-    }
-    if (function_exists('mb_strlen') && function_exists('mb_substr') && mb_strlen($name, 'UTF-8') > 180) {
-        $name = mb_substr($name, 0, 180, 'UTF-8');
-    }
-    return $name;
-}
-
-/**
  * 校验并返回落在附件目录（zb_users/upload/）内的真实路径，越界返回 ''
+ *
+ * 【只读展示用途】仅用于列表行展示「文件状态 / 图片尺寸」，绝不参与上传、替换、删除
+ * 等任何写决策——写操作全部交给官方附件体系。历史遗留记录（早期版本把
+ * zb_users/upload/... 整段存入 ul_Name）需要按前缀还原 URL，故保留本函数。
  */
 function at8_media_library_realpath_in_upload($path, $uploadRoot)
 {
@@ -1455,105 +1456,46 @@ function at8_media_library_upload_url($u)
 }
 
 /**
- * 允许上传的扩展名（跟随站点后台「允许上传的文件类型」设置）
- * - 站点设置了白名单 → 以站点为准（zba / apk 等站点允许的类型均可上传）
- * - 站点未设置 → 使用插件内置类型
- * - 服务端可执行脚本（php/exe/js/html 等）无论何时都拒绝
- * - svg / svgz / xml / xsl / swf 等可内嵌脚本的格式默认排除，站点明确允许时才放行
+ * 站点「允许上传的文件类型」——仅用于前端 <input accept> 提示
+ *
+ * 【重要】这不是插件的安全白名单，也不是第二个判断入口。
+ * 真正的上传类型安全判定只发生在官方 Upload::CheckExtName() 内部
+ * （读取 ZC_UPLOAD_FILETYPE，并硬拒绝 php / phtml / phar / .htaccess / web.config）。
+ * 本函数只是把官方配置原样读出来交给浏览器做「文件选择框过滤」，让用户在选文件时
+ * 就能看到哪些类型可传，减少一次无谓的服务端往返；即使有人绕过前端 accept，
+ * 也仍然由官方流程裁决，不存在「官方禁止 → 插件放行」的通路。
  */
-function at8_media_library_allow_exts()
+function at8_media_library_site_upload_filetypes()
 {
     global $zbp;
-
-    // 硬拒绝：可执行 / 服务端脚本，任何情况下不允许
-    $deny = array(
-        'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar',
-        'asp', 'aspx', 'jsp', 'jspx', 'cgi', 'pl', 'py', 'sh', 'bash',
-        'exe', 'dll', 'com', 'bat', 'cmd', 'msi', 'vbs', 'ps1',
-        'html', 'htm', 'shtml', 'xhtml', 'js', 'mjs', 'htaccess',
-        'ini', 'env',
-    );
-
-    // 硬排除的可内嵌脚本格式：无论站点是否允许都不经本插件上传（防同源 XSS），
-    // 系统自带附件管理不受影响，如需 svg 可走系统上传
-    $risky = array('svg', 'svgz', 'xml', 'xsl', 'xslt', 'swf');
-
-    $builtin = array(
-        'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico', 'heic', 'avif', 'tif', 'tiff',
-        'mp4', 'webm', 'flv', 'mov', 'avi', 'mkv', 'wmv', 'm4v',
-        'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac',
-        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv', 'epub',
-        'zip', 'rar', '7z', 'gz', 'tar', 'bz2', 'zba', 'apk', 'iso',
-    );
-
     $site = isset($zbp->option['ZC_UPLOAD_FILETYPE']) ? (string) $zbp->option['ZC_UPLOAD_FILETYPE'] : '';
-    $siteArr = preg_split('/[|,\s]+/', strtolower(trim($site)), -1, PREG_SPLIT_NO_EMPTY);
-    if (!is_array($siteArr) || count($siteArr) === 0) {
-        $siteArr = $builtin; // 站点未设置白名单时使用内置类型
-    }
-
-    $out = array();
-    foreach ($siteArr as $ext) {
-        if (in_array($ext, $deny) || in_array($ext, $risky)) {
-            continue;
-        }
-        $out[] = $ext;
-    }
-    // 对外接口：其他插件可增删白名单（deny / risky 硬拒绝在后续检查中仍然生效）
-    $out = at8_media_library_hook('at8_media_library_AllowExts', $out);
-    return $out;
+    $arr = preg_split('/[|,\s]+/', strtolower(trim($site)), -1, PREG_SPLIT_NO_EMPTY);
+    return is_array($arr) ? $arr : array();
 }
 
 /**
- * 是否图片类扩展名（图片需做内容校验）
+ * 站点允许的单文件上限（MB，官方 ZC_UPLOAD_FILESIZE）——仅用于前端提示文案
+ * 真正的体积判定只发生在官方 Upload::CheckSize() 内部
  */
-function at8_media_library_is_image_ext($ext)
+function at8_media_library_site_upload_filesize_mb()
 {
-    return in_array(strtolower($ext), array('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico'));
+    global $zbp;
+    return isset($zbp->option['ZC_UPLOAD_FILESIZE']) ? (int) $zbp->option['ZC_UPLOAD_FILESIZE'] : 0;
 }
 
 /**
- * 服务器允许的单文件上限（取 upload_max_filesize 与 post_max_size 的较小值）
- */
-function at8_media_library_max_upload_size()
-{
-    $to = function ($v) {
-        $v = trim((string) $v);
-        if ($v === '') {
-            return 0;
-        }
-        $unit = strtolower(substr($v, -1));
-        $num = (float) $v;
-        if ($unit === 'g') {
-            $num *= 1024 * 1024 * 1024;
-        } elseif ($unit === 'm') {
-            $num *= 1024 * 1024;
-        } elseif ($unit === 'k') {
-            $num *= 1024;
-        }
-        return (int) $num;
-    };
-    $a = $to(ini_get('upload_max_filesize'));
-    $b = $to(ini_get('post_max_size'));
-    $max = 0;
-    if ($a > 0 && $b > 0) {
-        $max = min($a, $b);
-    } elseif ($a > 0) {
-        $max = $a;
-    } elseif ($b > 0) {
-        $max = $b;
-    }
-    return $max;
-}
-
-/**
- * 上传错误码 -> 人话
+ * PHP 自身的上传错误码 -> 人话
+ *
+ * 这是「参数与 UX 层」的转述，不是插件的安全判定：文件超过 php.ini 的
+ * upload_max_filesize / post_max_size 时，PHP 在进入任何 PHP 代码之前就已拒绝，
+ * $_FILES['error'] 只会是 1/2，插件只是把官方/PHP 的结果翻译成人能看懂的话。
+ * 真正的站点级体积上限由官方 Upload::CheckSize()（ZC_UPLOAD_FILESIZE）裁决。
  */
 function at8_media_library_upload_error_text($code)
 {
     $map = array(
-        1 => '文件超过服务器限制（upload_max_filesize = ' . ini_get('upload_max_filesize') . '）',
-        2 => '文件超过表单限制（MAX_FILE_SIZE）',
+        1 => '文件超过服务器上限（php.ini 的 upload_max_filesize = ' . ini_get('upload_max_filesize') . '）',
+        2 => '文件超过表单上限（MAX_FILE_SIZE）',
         3 => '文件只上传了一部分，请重试',
         4 => '没有选择文件',
         6 => '服务器缺少临时目录',
@@ -1565,199 +1507,158 @@ function at8_media_library_upload_error_text($code)
 }
 
 /**
- * 探测文件 MIME
+ * 把单个上传文件交给 Z-BlogPHP 官方附件上传能力处理，返回官方生成的 Upload 对象
+ *
+ * ---------------------------------------------------------------------------
+ * 本函数不含任何附件安全 / 存储 / 命名 / 类型判断逻辑。以下全部由官方
+ * PostUpload()（zb_system/function/c_system_event.php）在其内部完成：
+ *
+ *   $zbp->CheckRights('UploadPst')        官方权限复核
+ *   new Upload()                          官方附件对象
+ *   同月重名检查（$zbp->GetUploadList）    官方命名规则
+ *   $upload->CheckExtName()               官方类型安全（ZC_UPLOAD_FILETYPE +
+ *                                         硬拒绝 php / phtml / phar / .htaccess / web.config）
+ *   $upload->CheckSize()                  官方体积安全（ZC_UPLOAD_FILESIZE）
+ *   $upload->SaveFile($tmp)               官方落盘 + Filter_Plugin_Upload_SaveFile
+ *                                         （云存储 / 对象存储插件经此 Hook 接管）
+ *   $upload->Save()                       官方附件记录写入
+ *   $zbp->AddCache($upload)               官方对象缓存
+ *   CountMemberArray(..., +1)             官方用户附件计数
+ *   Filter_Plugin_PostUpload_Succeed      官方上传成功 Hook
+ *
+ * 唯一的适配动作：官方 PostUpload() 以 $_FILES 为输入、并以「最后一个成功项」
+ * 作为返回值。媒体库需要逐文件返回结果与进度，因此这里把当前这一个文件按官方
+ * 期望的单文件结构交给它，调用后立即还原 $_FILES。
+ * 这不是「伪造 POST 请求」，没有 HTTP 往返、没有 include cmd.php、没有模拟浏览器，
+ * 也没有绕过官方任何一道校验——所有校验仍由官方代码执行。
+ *
+ * 官方校验失败时 ShowError() 抛出 ZbpErrorException（非 die），此处捕获后转成
+ * 插件统一的 JSON 错误，不向前端回显原始异常文本 / 路径 / SQL / 堆栈。
+ * ---------------------------------------------------------------------------
+ *
+ * @param array $fileInfo 单个 $_FILES 条目（name/type/tmp_name/error/size）
+ *
+ * @return Upload 官方附件对象（已写入数据库）
  */
-function at8_media_library_detect_mime($file, $ext)
+function at8_media_library_official_upload_one($fileInfo)
 {
-    $mime = '';
-    if (function_exists('finfo_open')) {
-        $fi = @finfo_open(FILEINFO_MIME_TYPE);
-        if ($fi) {
-            $mime = @finfo_file($fi, $file);
-            @finfo_close($fi);
-        }
-    }
-    if ($mime == '' && function_exists('mime_content_type')) {
-        $mime = @mime_content_type($file);
-    }
-    if ($mime == '' || $mime == 'application/octet-stream') {
-        $map = array(
-            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
-            'gif' => 'image/gif', 'webp' => 'image/webp', 'bmp' => 'image/bmp',
-            'ico' => 'image/x-icon', 'svg' => 'image/svg+xml',
-            'mp4' => 'video/mp4', 'webm' => 'video/webm', 'flv' => 'video/x-flv',
-            'mp3' => 'audio/mpeg', 'wav' => 'audio/wav', 'ogg' => 'audio/ogg',
-            'pdf' => 'application/pdf', 'txt' => 'text/plain',
-            'zip' => 'application/zip', 'rar' => 'application/x-rar-compressed',
-            '7z' => 'application/x-7z-compressed',
-            'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
-        $ext = strtolower($ext);
-        if (isset($map[$ext])) {
-            $mime = $map[$ext];
-        }
-    }
-    return $mime;
-}
-
-/**
- * 保存上传的单个文件，返回 Upload 对象
- */
-function at8_media_library_save_one($fileInfo, $logid)
-{
-    global $zbp;
-    // 官方权限项：上传 = UploadPst（对齐官方 PostUpload）
-    at8_media_library_require_right('UploadPst');
-
-    $err = isset($fileInfo['error']) ? (int) $fileInfo['error'] : 4;
-    if ($err !== 0) {
-        at8_media_library_error('上传失败：' . at8_media_library_upload_error_text($err));
-    }
-    if (!isset($fileInfo['tmp_name']) || !is_string($fileInfo['tmp_name']) || $fileInfo['tmp_name'] === '' || !is_uploaded_file($fileInfo['tmp_name'])) {
-        at8_media_library_error('上传失败：请检查文件是否有效（' . at8_media_library_display_name(isset($fileInfo['name']) ? $fileInfo['name'] : '') . '）');
+    if (!function_exists('PostUpload')) {
+        at8_media_library_error('当前 Z-BlogPHP 版本缺少官方附件上传接口，请先升级系统', 500);
     }
 
-    // 体积上限（跟随服务器 upload_max_filesize / post_max_size）
-    $max = at8_media_library_max_upload_size();
-    $size = (int) (isset($fileInfo['size']) ? $fileInfo['size'] : 0);
-    if ($max > 0 && $size > $max) {
-        at8_media_library_error('文件超过服务器上限 ' . at8_media_library_size_text($max));
+    $one = array(
+        'name' => isset($fileInfo['name']) ? (string) $fileInfo['name'] : '',
+        'type' => isset($fileInfo['type']) ? (string) $fileInfo['type'] : '',
+        'tmp_name' => isset($fileInfo['tmp_name']) ? (string) $fileInfo['tmp_name'] : '',
+        'error' => isset($fileInfo['error']) ? (int) $fileInfo['error'] : 4,
+        'size' => isset($fileInfo['size']) ? (int) $fileInfo['size'] : 0,
+    );
+
+    $savedFiles = $_FILES;
+    $_FILES = array('at8_media_library_upload' => $one);
+
+    $caught = null;
+    $u = false;
+    try {
+        $u = PostUpload();
+    } catch (Exception $e) {
+        $caught = $e;
+    } catch (Throwable $e) {
+        $caught = $e;
     }
 
-    $disk = at8_media_library_safe_filename($fileInfo['name']);   // 落盘名（安全字符集）
-    $show = at8_media_library_display_name($fileInfo['name']);    // 展示名（保留原始名称）
-    $dot = strrpos($disk, '.');
-    $ext = ($dot !== false) ? strtolower(substr($disk, $dot + 1)) : '';
-    $base = ($dot !== false) ? substr($disk, 0, $dot) : $disk;
-    $allow = at8_media_library_allow_exts();
-    if ($ext == '' || !in_array($ext, $allow)) {
-        at8_media_library_error('不允许上传的类型：.' . $ext . '（可在后台「网站设置 → 允许上传的文件类型」中调整）');
+    $_FILES = $savedFiles;
+
+    if ($caught !== null) {
+        at8_media_library_error(at8_media_library_official_error_text($caught), 400);
     }
-
-    // 防双扩展名：主名任一段为可执行脚本扩展名时拒绝（如 shell.php.jpg）
-    foreach (explode('.', $base) as $seg) {
-        if (preg_match('/^(php\d*|phtml|phar|pht)$/i', $seg)) {
-            at8_media_library_error('文件名包含可疑的可执行扩展名段（如 .php.），请重命名后再上传');
-        }
-    }
-
-    // 图片必须真的是图片（防止把脚本/可执行文件改名成图片上传）
-    if (at8_media_library_is_image_ext($ext)) {
-        $info = @getimagesize($fileInfo['tmp_name']);
-        $mime = strtolower((string) at8_media_library_detect_mime($fileInfo['tmp_name'], $ext));
-        if (!is_array($info) && strpos($mime, 'image/') !== 0) {
-            at8_media_library_error('文件内容不是有效图片：' . $show);
-        }
-    }
-
-    // 附件对象：存储格式对齐系统标准（ul_Name 仅存文件名，目录由对象 Dir 推导）
-    $u = new Upload();
-    $u->PostTime = time();
-    $u->Name = $base . '.' . $ext;
-
-    // 同名冲突处理（官方 SaveFile 不处理冲突，与系统上传一致：先改名再落盘）
-    if (is_file($u->FullFile)) {
-        $u->Name = $base . '_' . date('dHis') . '_' . mt_rand(100, 999) . '.' . $ext;
-    }
-
-    // 官方方法落盘：内置建目录、Windows 字符集转码，并触发 Filter_Plugin_Upload_SaveFile（云存储接管插件经此 hook 生效）
-    $u->SaveFile($fileInfo['tmp_name']);
-
-    // SaveFile 无论成败均返回 true（系统行为），落盘结果必须实际验证。
-    // Windows 下磁盘名为本地字符集转码结果，需按同一规则换算后检查。
-    // 兼容对象存储插件（fui_oss 等）：SaveFile hook 被接管时文件可能不落本地、由请求结束统一上传云端，
-    // 此时本地无文件不算失败——记录数据改从临时文件读取。
-    $storageHooked = !empty($GLOBALS['hooks']['Filter_Plugin_Upload_SaveFile']);
-    $diskName = $u->Name;
-    if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
-        $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $u->Name);
-        if (is_string($conv) && $conv !== '') {
-            $diskName = $conv;
-        }
-    }
-    $savedPath = $zbp->usersdir . $u->Dir . $diskName;
-    if (!is_file($savedPath)) {
-        if (!$storageHooked) {
-            at8_media_library_error('文件保存失败：目录不可写，或站点「允许上传的文件类型」设置与该扩展名冲突');
-        }
-        // 云存储接管：本地无落盘属预期行为，大小/MIME 从临时文件读取
-        $savedPath = $fileInfo['tmp_name'];
-        at8_media_library_audit('上传 #' . $u->Name . ' 本地未落盘（存储插件接管），按云端流程继续');
-    }
-    @chmod($savedPath, 0644);
-
-    $mime = at8_media_library_detect_mime($savedPath, $ext);
-    $u->SourceName = $show;
-    $u->Size = (int) @filesize($savedPath);
-    $u->MimeType = $mime;
-    $u->AuthorID = (int) $zbp->user->ID;
-    $u->LogID = max(0, (int) $logid);
-    $u->Save();
-
-    // 官方流程：更新用户附件数 + 触发官方上传成功 hook（对齐官方 PostUpload）
-    if (function_exists('CountMemberArray')) {
-        CountMemberArray(array((int) $zbp->user->ID), array(0, 0, 0, +1));
-    }
-    if (isset($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed']) && is_array($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed'])) {
-        foreach ($GLOBALS['hooks']['Filter_Plugin_PostUpload_Succeed'] as $fpname => &$fpsignal) {
-            $fpname($u);
-        }
+    if (!is_object($u) || !($u instanceof Upload) || (int) $u->ID <= 0) {
+        at8_media_library_error('上传失败：官方附件流程未生成附件记录', 400);
     }
 
     return $u;
 }
 
 /**
- * 按官方流程删除附件（对齐官方 DelUpload：Del + CountMemberArray(-1) + DelFile，此处加固为先删文件验证、再删记录）
- * - 标准记录：走系统 DelFile()（云存储插件经 Filter_Plugin_Upload_DelFile hook 接管，返回值可信）
- * - 旧格式记录：FullFile 指向不正确，按兼容路径删
- * - 本地文件存在但删除失败 → 返回 false，不删数据库记录（避免「记录没了文件还在」）
- * 返回 bool：true=删除成功
+ * 把附件删除交给 Z-BlogPHP 官方附件删除能力处理
+ *
+ * ---------------------------------------------------------------------------
+ * 官方 DelUpload()（zb_system/function/c_system_event.php）内部完成：
+ *
+ *   $zbp->CheckRights('UploadDel')                官方权限复核
+ *   $zbp->CheckRights('UploadAll') 或 本人附件      官方所有权判定
+ *   $u->Del()                                     官方附件记录删除
+ *                                                 + Filter_Plugin_Upload_Del
+ *   CountMemberArray(..., -1)                     官方用户附件计数
+ *   $u->DelFile()                                 官方文件删除
+ *                                                 + Filter_Plugin_Upload_DelFile
+ *                                                 （云存储 / 对象存储插件经此 Hook 接管）
+ *
+ * 本函数不计算磁盘路径、不 unlink、不自行计数、不做「先删文件再删记录」之类的
+ * 自定义编排，也不为失败做回滚补偿——附件生命周期完全由官方保证。
+ *
+ * 适配动作：官方 DelUpload() 从 $_GET['id'] 取目标附件 ID，故此处临时写入该值，
+ * 调用后立即还原。这同样不是伪造 HTTP 请求，权限与所有权仍由官方重新判定。
+ * ---------------------------------------------------------------------------
+ *
+ * @param int $id 附件 ID
+ *
+ * @return bool true=官方删除流程完成；false=官方拒绝（无权限 / 非本人附件 / 版本不支持）
  */
-function at8_media_library_delete_upload($u)
+function at8_media_library_official_delete_upload($id)
 {
-    $standard = at8_media_library_is_standard_name($u->Name);
-
-    // 官方 DelFile（云存储 hook 接管时返回 hook 的返回值）
-    $delRet = $u->DelFile();
-
-    // 本地残留校验：上传同款 Windows 字符集转码路径，DelFile 未覆盖到时兜底 unlink
-    $local = '';
-    if ($standard) {
-        global $zbp;
-        $diskName = $u->Name;
-        if (defined('PHP_SYSTEM') && PHP_SYSTEM === SYSTEM_WINDOWS && !empty($zbp->lang['windows_character_set'])) {
-            $conv = @iconv('UTF-8', $zbp->lang['windows_character_set'] . '//IGNORE', $u->Name);
-            if (is_string($conv) && $conv !== '') {
-                $diskName = $conv;
-            }
-        }
-        $p = $zbp->usersdir . $u->Dir . $diskName;
-        if (is_file($p)) {
-            $local = $p;
-        }
-    } else {
-        $local = at8_media_library_disk_path($u);
-    }
-    if ($local !== '' && is_file($local)) {
-        if (!@unlink($local) || is_file($local)) {
-            return false; // 文件删除失败，保留数据库记录
-        }
-    }
-    if ($delRet === false) {
-        return false; // 存储插件 hook 报告删除失败（如云端删除失败）
+    if (!function_exists('DelUpload')) {
+        return false;
     }
 
-    $u->Del();
-    // 官方流程：同步用户附件数（对齐官方 DelUpload）
-    if (function_exists('CountMemberArray')) {
-        CountMemberArray(array((int) $u->AuthorID), array(0, 0, 0, -1));
+    $savedGet = $_GET;
+    $_GET['id'] = (int) $id;
+
+    $caught = null;
+    $ok = false;
+    try {
+        $ok = (bool) DelUpload();
+    } catch (Exception $e) {
+        $caught = $e;
+    } catch (Throwable $e) {
+        $caught = $e;
     }
-    at8_media_library_audit('删除附件 #' . $u->ID . ' ' . $u->Name);
-    // 对外接口：删除成功事件
-    at8_media_library_hook('at8_media_library_DeleteSucceed', $u);
-    return true;
+
+    $_GET = $savedGet;
+
+    if ($caught !== null) {
+        // 官方 ShowError(6)（无 UploadDel 权限）等：不外抛异常文本，只记审计
+        at8_media_library_audit('官方删除流程拒绝 #' . (int) $id . '（错误码 ' . (int) $caught->getCode() . '）');
+        return false;
+    }
+
+    if ($ok) {
+        at8_media_library_audit('经官方流程删除附件 #' . (int) $id);
+    }
+
+    return $ok;
+}
+
+/**
+ * 官方附件流程的错误码 -> 插件对外文案
+ *
+ * 只翻译已知的官方错误码，未知错误一律给通用文案 + 错误码，
+ * 避免把原始异常文本（可能含服务器路径 / SQL / 堆栈）回显给前端。
+ */
+function at8_media_library_official_error_text($e)
+{
+    $code = (int) $e->getCode();
+    $map = array(
+        5 => '安全校验失败，请刷新页面后重试',
+        6 => '没有执行该附件操作的权限',
+        26 => '不允许上传该类型文件（可在后台「网站设置 → 允许上传的文件类型」中调整）',
+        27 => '文件超过站点允许的上传大小（可在后台「网站设置 → 允许上传的大小」中调整）',
+        28 => '同名文件在本月内已存在，请重命名后再上传',
+    );
+    if (isset($map[$code])) {
+        return $map[$code];
+    }
+    return '官方附件流程拒绝了本次操作（错误码 ' . $code . '）';
 }
 
 /**

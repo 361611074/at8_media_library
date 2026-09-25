@@ -2,6 +2,110 @@
 
 版本号规则：十进制封十进一（每段 0~9，满 10 进位），不用 1.2.10 这类写法。
 
+## 1.7.0（2026-09-25）
+
+**市场合规架构重构**：把本插件从「自行实现附件上传 / 替换 / 删除底层业务」改造成
+「媒体库 UI + Z-BlogPHP 官方附件系统适配层」。
+
+### 架构结论
+
+重构后，附件的上传、保存、删除全部由 Z-BlogPHP 官方附件系统执行，插件只负责
+查询 / 筛选 / 搜索 / 预览 / 统计 / UI。官方调用链（Z-BlogPHP 1.7.5.3540 源码实测确认）：
+
+```text
+上传：媒体库 api.php
+      → at8_media_library_official_upload_one()
+      → 官方 PostUpload()                        [c_system_event.php]
+          → $zbp->CheckRights('UploadPst')
+          → Upload::CheckExtName()               [lib/base/upload.php]
+          → Upload::CheckSize()                  [lib/base/upload.php]
+          → Upload::SaveFile()  + Filter_Plugin_Upload_SaveFile
+          → Upload::Save()
+          → $zbp->AddCache()
+          → CountMemberArray(..., +1)
+          → Filter_Plugin_PostUpload_Succeed
+
+删除：媒体库 api.php
+      → at8_media_library_official_delete_upload()
+      → 官方 DelUpload()                         [c_system_event.php]
+          → $zbp->CheckRights('UploadDel') / 'UploadAll'
+          → Upload::Del()       + Filter_Plugin_Upload_Del
+          → CountMemberArray(..., -1)
+          → Upload::DelFile()   + Filter_Plugin_Upload_DelFile
+
+编辑：媒体库 api.php → 官方 Upload::Save()（只写自有展示字段与 LogID 关联）
+
+关联：媒体库 api.php → 官方 Upload::Save()（写官方 ul_LogID 字段）
+```
+
+### 移除的自实现附件底层逻辑
+
+- **上传安全体系**：删除插件自建的扩展名白名单（`at8_media_library_allow_exts()`，含
+  `deny` / `risky` / `builtin` 三张表）、删除防双扩展名自检、删除图片内容
+  `getimagesize()` + `finfo` 双重校验、删除 `is_uploaded_file()` 自检、删除自读
+  `php.ini` 的 `upload_max_filesize` / `post_max_size` 体积判定
+  （`at8_media_library_max_upload_size()`）。以上改由官方
+  `Upload::CheckExtName()` / `CheckSize()` 裁决。
+- **文件命名核心规则**：删除 `at8_media_library_safe_filename()`（自建字符白名单重写文件名）
+  与同月重名自动改名逻辑，改由官方「同月重名即拒绝」规则处理。
+- **MIME 探测**：删除 `at8_media_library_detect_mime()`，MIME 直接采用官方
+  `PostUpload()` 写入的 `$_FILES['type']`。
+- **文件保存体系**：删除 `at8_media_library_save_one()` 中自建的 `new Upload()` 装配、
+  `SaveFile()` 后本地落盘校验、Windows 字符集换算、`chmod`、`filesize` / MIME 回填、
+  `CountMemberArray(+1)`、`Filter_Plugin_PostUpload_Succeed` 手动触发——整段逻辑由
+  官方 `PostUpload()` 一次完成。
+- **文件删除体系**：删除 `at8_media_library_delete_upload()` 中自建的
+  `DelFile()` → 本地路径计算 → `@unlink()` 兜底 → `Del()` → `CountMemberArray(-1)` 编排。
+  插件不再对附件文件执行任何 `unlink`，也不再自行计算附件磁盘路径用于删除。
+- **替换引擎**：删除 `act=replace` 全部逻辑（原文件备份 / 临时文件 `copy` 恢复 /
+  `DelFile` + `SaveFile` 串联 / 本地直替分支 / 扩展名一致性校验 / 伪原子回滚）。
+  Z-BlogPHP 官方附件系统未提供可复用的附件替换能力，本版本**移除「替换文件」功能**，
+  不再自行维护一套替换引擎。
+- **重复 Hook**：移除 `Filter_Plugin_at8_media_library_AllowExts`（会构成绕过官方上传白名单的
+  第二判断入口）、`UploadSucceed`（与官方 `Filter_Plugin_PostUpload_Succeed` 重复）、
+  `DeleteSucceed`（官方无对应删除成功 Hook，插件不再自造涉及附件敏感业务的接口）。
+
+### 保留与加固
+
+- 保留媒体库核心能力：网格 / 列表视图、分类 / 类型 / 月份 / 上传者 / 使用状态筛选、
+  关键词搜索、排序分页、详情侧栏、灯箱、URL / HTML / Markdown 复制、统计概览、文章关联。
+- 保留权限模型：`UploadMng`（查看）/ `UploadPst`（上传、编辑、关联）/ `UploadDel`（删除）/
+  `UploadAll`（操作他人附件），并对齐官方 `Admin_UploadMng` 的数据范围。
+- 保留只读展示辅助：`at8_media_library_disk_path()` / `is_standard_name()` /
+  `upload_url()` 仅用于列表行展示「文件状态 / 图片尺寸」，已加注释明确**不参与任何写决策**；
+  仍兼容早期版本把路径写进 `ul_Name` 的历史记录。
+- **缓存 Key 补站点环境前缀**：Redis / APCu 按服务器进程共享，同一服务器多站点原先会
+  互相命中 `at8ml:stats_all` 等键，现统一加站点根目录指纹。
+- 上传面板的 `accept` 提示与提示文案改读官方站点配置（`ZC_UPLOAD_FILETYPE` /
+  `ZC_UPLOAD_FILESIZE`），仅作 UI 提示，不构成服务端安全判断。
+- 官方错误（`ZbpErrorException`，错误码 5 / 6 / 26 / 27 / 28）统一转成插件 JSON 文案，
+  不回显原始异常文本、服务器路径或堆栈。
+
+### 行为变化（升级须知）
+
+- **「替换文件」功能已移除**：如需更换附件内容，请删除后重新上传。原功能会保持附件 ID 与
+  URL 不变，新流程下会生成新的附件记录与 URL。
+- **同名文件规则变化**：原先插件会自动改名（`名字_日期时间_随机数.ext`）后落盘，
+  现在与系统自带附件管理一致——同一月份内同名文件会被官方直接拒绝。
+- **上传文件名的落盘形式变化**：不再对文件名做字符白名单重写，直接采用官方
+  `Upload::SaveFile()` 的落盘规则（文件名保持用户上传的原名；URL 由官方 `Upload::Url`
+  做 `rawurlencode`）。
+- **上传体积上限口径变化**：由「php.ini 的 `upload_max_filesize` / `post_max_size`」
+  改为官方「网站设置 → 允许上传的大小」（`ZC_UPLOAD_FILESIZE`，单位 MB）。
+- **删除失败语义变化**：官方 `DelUpload()` 为先删记录、后删文件且不检查文件删除结果，
+  插件不再为失败做回滚补偿，也不再出现「文件删不掉就保留记录」的自定义行为。
+
+### 兼容性
+
+- 1.6.6 → 1.7.0 可直接覆盖升级：插件配置、已有附件记录、附件实体文件、自定义展示字段
+  （`Metas` 内的 `media_title` / `media_alt`）全部保留；升级后写操作即进入新架构，
+  不会回落到旧上传引擎。
+- 最低 Z-BlogPHP 1.7.0（`<adapted>172900</adapted>` 不变）；官方 `PostUpload()` /
+  `DelUpload()` 缺失时给出明确提示而非静默失败。
+- 最低 PHP 7.4（不变）。
+- 兼容本地存储与各类云存储 / 对象存储插件：上传经官方 `Filter_Plugin_Upload_SaveFile`、
+  删除经官方 `Filter_Plugin_Upload_DelFile`，插件不假设「附件一定在本地磁盘」。
+
 ## 1.6.6（2026-09-24）
 
 修复 debug 模式下的一条 PHP 警告（无功能变更）：

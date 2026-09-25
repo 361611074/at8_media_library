@@ -409,7 +409,6 @@
 			'<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-copyhtml">复制 HTML</button>' +
 			'<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-copymd">复制 Markdown</button>' +
 			'<a class="mlx-btn mlx-btn-sm" href="' + esc(item.url) + '" target="_blank">新窗口打开</a>' +
-			(canEdit ? '<button type="button" class="mlx-btn mlx-btn-sm" id="ml-dw-replace">替换文件</button>' : '') +
 			(AT8ML.canDelete ? '<button type="button" class="mlx-btn mlx-btn-sm mlx-btn-danger" id="ml-dw-del">删除</button>' : '') +
 			'</div>' +
 			(canEdit ?
@@ -426,8 +425,7 @@
 			'</div></div>' +
 			'<button type="button" class="mlx-btn mlx-btn-primary mlx-dw-save" id="ml-dw-save">保存修改</button>'
 			: '') +
-			'</div>' +
-			(canEdit ? '<input type="file" id="ml-dw-file" style="display:none">' : '');
+			'</div>';
 
 		dw.className = 'mlx-drawer open';
 		$('ml-drawer-mask').className = 'mlx-drawer-mask open';
@@ -488,23 +486,6 @@
 				closeDrawer();
 				loadList();
 				loadStats();
-			});
-		});
-
-		$('ml-dw-replace').addEventListener('click', function () { $('ml-dw-file').click(); });
-		$('ml-dw-file').addEventListener('change', function () {
-			let f = this.files[0];
-			if (!f) return;
-			let fd = new FormData();
-			fd.append('act', 'replace');
-			fd.append('id', item.id);
-			fd.append('file', f);
-			toast('正在替换…');
-			apiPost(fd, function (d) {
-				toast('替换成功');
-				state.current = d;
-				refreshItem(d);
-				loadList();
 			});
 		});
 
@@ -913,6 +894,9 @@
 			tip.id = 'ml-dropzone-tip';
 			document.body.appendChild(tip);
 		}
+		// 文件选择框过滤：类型列表来自站点「允许上传的文件类型」配置（仅 UI 提示，
+		// 最终是否放行仍由服务端官方附件流程裁决，前端限制不作为安全边界）
+		if (AT8ML.uploadAccept) $('ml-up-input').setAttribute('accept', AT8ML.uploadAccept);
 		// 上传面板可选文章（最近文章）
 		apiGet({ act: 'posts' }, function (list) {
 			let sel = $('ml-upload-logid');
