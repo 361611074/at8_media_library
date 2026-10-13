@@ -1,6 +1,7 @@
 # at8_media_library 1.7.2 — 发布检查清单（RELEASE_CHECKLIST）
 
-**实测环境**：Z-BlogPHP **1.7.5.3540** / PHP **8.3.35 (NTS)** / **pdo_sqlite** / Windows
+**实测环境**：本地 Z-BlogPHP **1.7.5.3540** / PHP **8.3.35 (NTS)** / **pdo_sqlite** / Windows
+＋ 真实站 Z-BlogPHP **1.7.5.3540** / PHP **8.3** / **mysqli** / 宝塔 + Nginx（见第 7 节）
 **检查日期**：2026-10-13
 **检查方式**：全部为**真实执行**——HTTP 请求走完整后台鉴权与 CSRF 链路，
 附件读写调用官方 `PostUpload()` / `DelUpload()` / `Upload::Save()`，
@@ -145,7 +146,59 @@
 
 ---
 
-## 7. ZBA 打包与解包核验
+## 7. 真实站点实测（**独立生产环境 · mysqli 驱动**）
+
+**环境**：宝塔面板服务器 / Z-BlogPHP **1.7.5.3540** / PHP **8.3** / **数据库 mysqli** /
+主题 tpure / 已启用 `debug` 插件 **1.0.4**（页面底部调试面板）。
+**部署方式**：官方 `App::UnPack()` 解包 1.7.2 ZBA 到插件目录 →
+`UNPACK OK`、`check_error_count=0` → 修正属主权限。
+**一致性**：解包后服务器 **12 文件 MD5 与本地仓库完全一致**。
+
+### 7.1 页面报错扫描（15 个页面，全部 http=200、**零 PHP 报错**）
+
+| 类别 | 页面 | http | PHP 报错 |
+|---|---|---|---|
+| 插件 | 媒体库主页面 / 带分类筛选 / 未关联筛选 | 200 | 0 |
+| 核心后台 | 后台首页 / 文章管理 / 附件管理 / 插件管理 / 分类管理 / 评论管理 / 主题管理 / 设置 | 200 | 0 |
+| 编辑页 | `cmd.php?act=ArticleEdt&id=1` / `cmd.php?act=ArticleEdt` | 200 | 0 |
+| 前台 | 首页 / 文章页 | 200 | 0 |
+
+### 7.2 `debug` 1.0.4 调试面板
+
+- 面板在插件页正常注入，**无错误 / 警告条目**。
+- 面板统计：**共执行 8 条 SQL**，其中「**3 条本插件统计 sql 的语句**」；
+  数据库驱动确认为 **mysqli**（`lib/database/mysqli.php`）。
+  这 3 条统计 SQL 正是 1.7.2 修复所针对的代码路径，在 mysqli 下执行正常。
+
+### 7.3 AJAX 接口实测（mysqli）
+
+| 接口 | 结果 |
+|---|---|
+| `stats` | ✅ `{total:2, images:2, total_size:2681225, total_size_text:"2.56 MB", unused:2, months:[{2026-09,2}], authors:[{1,361611074,2}], categories:[{1,未分类}]}` |
+| `list` | ✅ 200，返回附件行 |
+| `posts` | ✅ 200，返回 `[{id:1,title:"欢迎使用Z-BlogPHP！"},{id:2,title:"留言本"}]` |
+| `categories` | ✅ 200，返回 `[{id:1,name:"未分类"}]` |
+| `quotecheck`（存在 id） | ✅ 200 `{success:true}` |
+| `quotecheck`（不存在 id） | ✅ **404**（nginx `fastcgi_intercept_errors` 会把上游 404 体替换为 HTML，故只按状态码断言） |
+| 未知 `act` | ✅ **400** |
+
+### 7.4 无头浏览器端到端（真实站点）
+
+用无头 Chrome 登录真实站并打开页面，捕获 `pageerror` / `console.error` / 5xx 响应：
+
+| 页面 | 结果 |
+|---|---|
+| 媒体库主页面 | ✅ 渲染 2 张附件卡片；统计栏「2 全部附件 / 2 图片 / 2.56 MB 占用空间 / 2 未关联文章」；**0 个页面错误** |
+| 文章编辑页 | ✅ 插件「文章附件」面板（`#ml-edit-panel` / `#ml-edit-mask`）正常注入；**0 个页面错误** |
+
+> 说明：本次曾误用 `zb_system/admin/index.php?act=ArticleEdt`（该入口的 `switch` 仅支持
+> 12 个 action，`ArticleEdt` 不在其中）导致 500，与插件无关；正确入口为
+> `zb_system/cmd.php?act=ArticleEdt&id=N`，重测后 200 且无报错。停用本插件后该 500 依旧存在，
+> 已反向排除插件嫌疑。
+
+---
+
+## 8. ZBA 打包与解包核验
 
 - **打包**：用官方 `App::Pack()` + `gzencode(9)` 生成
   `at8_media_library_1.7.2_20261013.zba`，**92272 bytes**
@@ -160,7 +213,7 @@
 
 ---
 
-## 8. 截图（发布物）
+## 9. 截图（发布物）
 
 4 张后台截图已用**全新演示数据集**（27 附件 / 26 图片 / 1.45 MB / 11 未关联）重制，
 尺寸与原图一致：
@@ -174,20 +227,24 @@
 
 ---
 
-## 9. 未实测 / 未解决事项（如实标注）
+## 10. 未实测 / 未解决事项（如实标注）
 
 | 项 | 状态 | 说明 |
 |---|---|---|
 | **真实第三方对象存储**（S3 / OSS / COS 等） | ⚠️ **未实测** | 仅通过探针确认官方 `Filter_Plugin_Upload_SaveFile` / `Filter_Plugin_Upload_DelFile` **确实被触发**，理论上第三方存储插件可接管；但**未搭建真实对象存储环境端到端验证**，不得视为已验证 |
-| `pdo_mysql` / `pdo_pgsql` / `mysqli` | ⚠️ **本次未实测** | 本次实测为 `pdo_sqlite`。1.7.2 修复点（改用按列名读取）对 `mysqli`（本就返回命名键）行为不变；PDO 家族其余驱动按同一修复逻辑处理，但未在本次逐一实测 |
+| `pdo_mysql` / `pdo_pgsql` | ⚠️ **未实测** | 1.7.2 修复点为「改用按列名读取」，PDO 家族驱动（`fetchAll()` 默认 `FETCH_BOTH`）为同一逻辑，但仅在 `pdo_sqlite` 上实测 |
+| `mysqli` | ✅ **已实测** | 真实站（宝塔 + mysqli）15 页零报错、统计/列表接口返回值正确、无头浏览器渲染正常；mysqli 本就返回命名键，1.7.2 改动对其行为不变 |
 | 后台独立管理页的浏览器端交互（拖拽、无限滚动） | ⚠️ 仅截图目视 | 已通过截图目视确认渲染正确，未做浏览器自动化交互断言 |
 
 ---
 
-## 10. 发布物
+## 11. 发布物
 
 - `at8_media_library_1.7.2_20261013.zba`（12 文件，92272 bytes）
-- GitHub：https://github.com/361611074/at8_media_library
+- GitHub 仓库：https://github.com/361611074/at8_media_library
+- GitHub Release：https://github.com/361611074/at8_media_library/releases/tag/v1.7.2
+  （附 `at8_media_library_1.7.2_20261013.zba`）
+- Git：main `2e5415c` / tag `v1.7.2`
 
 ---
 
@@ -201,3 +258,6 @@
 | `upgrade.sh` | 降级 → 官方端点上传 → 官方升级钩子 | 10/10 PASS |
 | `verify_zba2.php` | ZBA manifest vs 仓库 | 12/12 匹配 |
 | `verify_unpacked2.php` | 解包目录 vs 仓库 | 12/12 匹配 |
+| `roundtrip.php` | 官方 `App::UnPack` 往返 vs 仓库 | 12/12 匹配、`check_error_count=0` |
+| `.tmp/at8_scan.sh` | 真实站 15 页面报错扫描 | 全 200 / 0 报错 |
+| `shot_remote.js` | 真实站无头浏览器端到端 + 截图 | 0 页面错误 |
