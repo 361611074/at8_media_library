@@ -8,7 +8,7 @@ if (!defined('ZBP_PATH')) {
 }
 
 if (!defined('AT8_MEDIA_LIBRARY_VERSION')) {
-    define('AT8_MEDIA_LIBRARY_VERSION', '1.7.1');
+    define('AT8_MEDIA_LIBRARY_VERSION', '1.7.2');
 }
 
 /**
@@ -391,8 +391,7 @@ function at8_media_library_post_ids_by_cate($cateid)
         );
         $res = $zbp->db->Query($sql);
         foreach ($res as $r) {
-            $v = array_values($r);
-            $ids[] = (int) $v[0];
+            $ids[] = (int) $r['log_ID'];
         }
     }
     return array_values(array_unique($ids));
@@ -413,8 +412,7 @@ function at8_media_library_cate_name_map()
     $sql = $zbp->db->sql->Select($table, array('cate_ID', 'cate_Name'), null, null, null);
     $res = $zbp->db->Query($sql);
     foreach ($res as $r) {
-        $v = array_values($r);
-        $map[(int) $v[0]] = (string) $v[1];
+        $map[(int) $r['cate_ID']] = (string) $r['cate_Name'];
     }
     return $map;
 }
@@ -450,8 +448,7 @@ function at8_media_library_post_cate_map($logIds)
         );
         $res = $zbp->db->Query($sql);
         foreach ($res as $r) {
-            $v = array_values($r);
-            $map[(int) $v[0]] = (int) $v[1];
+            $map[(int) $r['log_ID']] = (int) $r['log_CateID'];
         }
     }
     return $map;
@@ -478,8 +475,7 @@ function at8_media_library_post_info_map($logIds)
         );
         $res = $zbp->db->Query($sql);
         foreach ($res as $r) {
-            $v = array_values($r);
-            $map[(int) $v[0]] = array('title' => (string) $v[1], 'cateid' => (int) $v[2]);
+            $map[(int) $r['log_ID']] = array('title' => (string) $r['log_Title'], 'cateid' => (int) $r['log_CateID']);
         }
     }
     return $map;
@@ -506,8 +502,7 @@ function at8_media_library_member_name_map($uids)
         );
         $res = $zbp->db->Query($sql);
         foreach ($res as $r) {
-            $v = array_values($r);
-            $map[(int) $v[0]] = (string) $v[1];
+            $map[(int) $r['mem_ID']] = (string) $r['mem_Name'];
         }
     }
     return $map;
@@ -792,13 +787,14 @@ function at8_media_library_scan($scoped = false)
     );
 
     foreach ($res as $r) {
-        $v = array_values($r);
-        $logId = (int) $v[1];
-        $authorId = (int) $v[2];
-        $postTime = (int) $v[3];
-        $size = (int) $v[4];
-        $mime = (string) $v[5];
-        $name = (string) $v[6];
+        // 按列名读取（兼容 mysqli 的纯命名键与 PDO（pdo_sqlite/pdo_mysql/pdo_pgsql）
+        // fetchAll() 默认 FETCH_BOTH 的双键结果；位置索引在 PDO 下会错位）
+        $logId = (int) $r['ul_LogID'];
+        $authorId = (int) $r['ul_AuthorID'];
+        $postTime = (int) $r['ul_PostTime'];
+        $size = (int) $r['ul_Size'];
+        $mime = (string) $r['ul_MimeType'];
+        $name = (string) $r['ul_Name'];
 
         $data['total']++;
         $data['total_size'] += $size;

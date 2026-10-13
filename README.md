@@ -84,7 +84,7 @@
 
 卸载插件不会删除任何已上传的附件文件与数据库记录。
 
-## 开发者接口（v1.5.0 起；1.7.1 对外提供 5 个 Filter 接口）
+## 开发者接口（v1.5.0 起；v1.7.2 对外提供 5 个 Filter 接口）
 
 本插件对外暴露 5 个 Filter 接口，**全部只用于展示与查询**。其他插件 / 主题在 `ActivePlugin_应用ID()` 中用官方 `Add_Filter_Plugin()` 挂载即可。`$arg` 声明 `&` 可修改，`$context` 为只读上下文、可不接收。
 
@@ -121,6 +121,14 @@ function myapp_Thumb(&$url, $upload) {
 ```
 
 ## 更新日志
+
+### 1.7.2（2026-10-13）
+
+SQLite / PDO-MySQL / PostgreSQL 统计与映射修复（附件写操作架构不变）：
+
+- 修复 PDO 驱动（pdo_sqlite / pdo_mysql / pdo_pgsql）下 `fetchAll()` 默认 `FETCH_BOTH` 双键结果导致的位置索引错位：`at8_media_library_scan()`（统计）与五处批量映射（`post_ids_by_cate` / `cate_name_map` / `post_cate_map` / `post_info_map` / `member_name_map`）改用按列名读取；MySQL（mysqli）行为不变。此前在 SQLite / PDO 站点上「统计概览」的图片数恒为 0、占用空间恒等于附件条数、上传月份恒为 1970-01、上传者列表为空；
+- 截图刷新：`screenshots/03` 重截，移除 1.7.1 快照中残留的已下线「替换文件」按钮；
+- 1.7.1 → 1.7.2 可直接覆盖升级，无配置迁移、无数据结构变更。
 
 ### 1.7.1（2026-09-25）
 

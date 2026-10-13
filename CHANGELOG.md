@@ -2,6 +2,33 @@
 
 版本号规则：十进制封十进一（每段 0~9，满 10 进位），不用 1.2.10 这类写法。
 
+## 1.7.2（2026-10-13）
+
+**SQLite / PostgreSQL 统计与映射修复**（1.7.1 已在 GitHub 打 tag 发布后的修复，附件写操作架构不变）：
+
+- **修复 PDO 驱动下查询结果位置索引错位**：`at8_media_library_scan()`（统计）与
+  `post_ids_by_cate()` / `cate_name_map()` / `post_cate_map()` / `post_info_map()` /
+  `member_name_map()` 五处批量映射原先用 `array_values($r)` 按位置取列。
+  Z-BlogPHP 的 mysqli 驱动 `mysqli_fetch_assoc()` 只返回命名键，碰巧可用；
+  而 pdo_sqlite / pdo_mysql / pdo_pgsql 驱动的 `fetchAll()` 默认为 `FETCH_BOTH`，
+  每行同时含命名键与数字键，`array_values()` 后位置全部偏移一位
+  （`ul_AuthorID` 读到 `ul_LogID` 的值、`ul_Size` 读到 1、`ul_PostTime` 读到 0 等）。
+  表现为：SQLite / PDO-MySQL / PostgreSQL 站点上，媒体库「统计概览」的
+  图片数恒为 0、占用空间恒等于附件条数、上传月份恒为 1970-01、上传者列表为空，
+  列表页关联文章标题与分类名显示为空。现全部改为按列名读取
+  （`$r['ul_LogID']` / `$r['ul_PostTime']` / …），两种驱动族行为一致。
+  单列聚合计数（`COUNT(*)` / `SUM()`）为单列结果，位置取值本就正确，未改动。
+- **截图刷新**：`screenshots/03` 重截——1.7.1 的快照仍带着已移除的「替换文件」按钮，
+  与当前界面不符；新版为 1.7.2 实际运行界面。
+- 附件上传 / 删除 / 编辑仍全部走官方 `PostUpload()` / `DelUpload()` / `Upload::Save()`，
+  架构与 1.7.0 / 1.7.1 完全一致；`ConfigVer` 无变更，1.7.1 → 1.7.2 可直接覆盖升级。
+
+### 兼容性
+
+- 1.7.1 → 1.7.2 可直接覆盖升级：无配置迁移、无数据结构变更、无新增接口。
+- 最低 Z-BlogPHP 1.7.0（`<adapted>172900</adapted>` 不变）；最低 PHP 7.4（不变）。
+- MySQL（mysqli）行为不变；SQLite / pdo_mysql / pdo_pgsql 统计与映射修复为正确值。
+
 ## 1.7.1（2026-09-25）
 
 **官方市场审核前最终架构收尾**（无新增功能，不改动附件处理架构）。
